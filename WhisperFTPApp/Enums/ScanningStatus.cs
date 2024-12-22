@@ -2,5 +2,7 @@
 
 public enum ScanningStatus
 {
-    
+    Canceled,
+    Paused,
+    Running
 }

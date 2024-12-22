@@ -1,6 +1,11 @@
 ﻿namespace WhisperFTPApp.Configurations.Abstract;
 
-public class ConfigurationBase
+public abstract class ConfigurationBase
 {
-    
+    protected ConfigurationBase(int timeout)
+    {
+        Timeout = timeout;
+    }
+
+    public int Timeout { get; }
 }

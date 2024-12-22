@@ -3,18 +3,256 @@
         xmlns:vm="using:WhisperFTPApp.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        xmlns:conv="using:WhisperFTPApp.Converters"
+        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600"
         x:Class="WhisperFTPApp.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="WhisperFTPApp">
+        Title="WhisperFTP">
+    
+    <Window.Resources>
+        <conv:FtpTypeConverter x:Key="TypeConverter"/>
+        <conv:FileSizeConverter x:Key="FileSizeConverter"/>
+        <StreamGeometry x:Key="ListOfConnections">M5,13H19V11H5M3,17H17V15H3M7,7V9H21V7</StreamGeometry>
+        <StreamGeometry x:Key="DisconnectIcon">M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,19H5V5H19V19M17,8.4L13.4,12L17,15.6L15.6,17L12,13.4L8.4,17L7,15.6L10.6,12L7,8.4L8.4,7L12,10.6L15.6,7L17,8.4Z</StreamGeometry>
+        <StreamGeometry x:Key="CleanIcon">M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M10,11V17H12V11H10M14,11V17H16V11H14Z</StreamGeometry>
+        <StreamGeometry x:Key="ArrowUpIcon">M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z</StreamGeometry>
+        <StreamGeometry x:Key="UploadIcon">M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z</StreamGeometry>
+        <StreamGeometry x:Key="DownloadIcon">M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z</StreamGeometry>
+        <StreamGeometry x:Key="DeleteIcon">M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z</StreamGeometry>
+        <StreamGeometry x:Key="RefreshIcon">M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z</StreamGeometry>
+        <StreamGeometry x:Key="FolderIcon">M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z</StreamGeometry>
+    </Window.Resources>
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
+    <Window.Styles>
+        <Style Selector="Button">
+            <Setter Property="Background" Value="#222"/>
+            <Setter Property="Foreground" Value="#FFF"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="Background" Value="#000"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Border.panel">
+            <Setter Property="Background" Value="#5d0085"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="BoxShadow" Value="0 2 4 0 #20000000"/>
+        </Style>
+    </Window.Styles>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <DockPanel Margin="16">
+        <!-- Navigation Panel -->
+        <Border Classes="panel" DockPanel.Dock="Top" Padding="16,8" Margin="0,0,0,16">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Command="{Binding NavigateUpCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <PathIcon Data="{StaticResource ArrowUpIcon}"/>
+                        <TextBlock Text="Up"/>
+                    </StackPanel>
+                </Button>
+                <ItemsControl ItemsSource="{Binding Breadcrumbs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="4"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Classes="link" Content="{Binding Display}"
+                                    Command="{Binding NavigateCommand}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
 
+        <!-- Connection Panel -->
+        <Border Classes="panel" DockPanel.Dock="Top" Padding="16" Margin="0,0,0,16">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBox Width="300" Watermark="FTP Address (ftp://example.com)" Text="{Binding FtpAddress}"/>
+                <TextBox Width="150" Watermark="Username" Text="{Binding Username}"/>
+                <TextBox Width="150" Watermark="Password" PasswordChar="•" Text="{Binding Password}"/>
+                <TextBox Width="60" 
+                         Watermark="Port" 
+                         Text="{Binding Port}"/>
+                <Button Command="{Binding ConnectCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <PathIcon Data="{StaticResource RefreshIcon}"/>
+                        <TextBlock Text="Connect"/>
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding DisconnectCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <PathIcon Data="{StaticResource DisconnectIcon}"/>
+                        <TextBlock Text="Disconnect"/>
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding CleanCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <PathIcon Data="{StaticResource CleanIcon}"/>
+                        <TextBlock Text="Clean"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Status Bar -->
+        <Border Classes="panel" DockPanel.Dock="Bottom" Padding="16,8" Margin="0,16,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="16">
+                <ProgressBar Width="200" Height="4" Value="{Binding TransferProgress}"/>
+                <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Local Files Panel -->
+<Border Classes="panel" Grid.Column="0" Padding="16">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Spacing="8">
+            <!-- Drive Selection -->
+            <ComboBox ItemsSource="{Binding AvailableDrives}"
+                      SelectedItem="{Binding SelectedDrive}"
+                      Width="100">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <!-- Local Navigation -->
+            <DockPanel Margin="0,4">
+                <Button DockPanel.Dock="Left" 
+                        Command="{Binding NavigateLocalUpCommand}"
+                        Margin="0,0,4,0">
+                    <PathIcon Data="{StaticResource ArrowUpIcon}"/>
+                </Button>
+                <TextBox Text="{Binding LocalCurrentPath}"/>
+            </DockPanel>
+        </StackPanel>
+
+        <!-- Local Files Stats -->
+        <StackPanel DockPanel.Dock="Bottom" 
+                    Orientation="Horizontal" 
+                    Spacing="16" 
+                    Margin="0,8,0,0">
+            <TextBlock Text="{Binding LocalFileStats.TotalItems, 
+                       StringFormat='Items: {0}'}" />
+            <TextBlock Text="{Binding LocalFileStats.TotalSize, 
+                       Converter={StaticResource FileSizeConverter}, 
+                       StringFormat='Size: {0}'}"/>
+        </StackPanel>
+
+        <!-- Local Files Grid -->
+        <DataGrid ItemsSource="{Binding LocalItems}"
+                  SelectedItem="{Binding SelectedLocalItem}"
+                  IsReadOnly="True"
+                  AutoGenerateColumns="False"
+                  Margin="0,8">
+            <Interaction.Behaviors>
+                <EventTriggerBehavior EventName="DoubleTapped">
+                    <InvokeCommandAction Command="{Binding NavigateToLocalDirectoryCommand}" 
+                                            CommandParameter="{Binding SelectedLocalItem}"/>
+                </EventTriggerBehavior>
+            </Interaction.Behaviors>
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="Name" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <PathIcon Data="{StaticResource FolderIcon}"
+                                              IsVisible="{Binding IsDirectory}"/>
+                                    <TextBlock Text="{Binding Name}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTextColumn Header="Size" 
+                                    Binding="{Binding Size, 
+                                   Converter={StaticResource FileSizeConverter}}"/>
+                <DataGridTextColumn Header="Modified" 
+                                    Binding="{Binding Modified, 
+                                   StringFormat={}{0:g}}"/>
+                <DataGridTextColumn Header="Type" 
+                                    Binding="{Binding Type}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Border>
+
+            <!-- Remote Files Panel -->
+            <Border Classes="panel" Grid.Column="2" Padding="16">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,16">
+                        <TextBlock Text="Remote Files" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        <Button Command="{Binding UploadCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <PathIcon Data="{StaticResource UploadIcon}"/>
+                                <TextBlock Text="Upload"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding DownloadCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <PathIcon Data="{StaticResource DownloadIcon}"/>
+                                <TextBlock Text="Download"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding DeleteCommand}" Classes="danger">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <PathIcon Data="{StaticResource DeleteIcon}"/>
+                                <TextBlock Text="Delete"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding RefreshCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <PathIcon Data="{StaticResource RefreshIcon}"/>
+                                <TextBlock Text="Refresh"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
+                        <TextBlock Text="{Binding RemoteFileStats.TotalItems, StringFormat='Items: {0}'}" />
+                        <TextBlock Text="{Binding RemoteFileStats.TotalSize, 
+                                   Converter={StaticResource FileSizeConverter}, 
+                                   StringFormat='Size: {0}'}"/>
+                    </StackPanel>
+
+                <DataGrid ItemsSource="{Binding FtpItems}" 
+                          AutoGenerateColumns="False" 
+                          SelectedItem="{Binding SelectedFtpItem}"
+                          IsReadOnly="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Name" Binding="{Binding Name}"/>
+                        <DataGridTextColumn Header="Size" 
+                                          Binding="{Binding Size, 
+                                                   Converter={StaticResource FileSizeConverter}}"/>
+                        <DataGridTextColumn Header="Modified" 
+                                          Binding="{Binding Modified, StringFormat={}{0:g}}"/>
+                        <DataGridTextColumn Header="Type" 
+                                          Binding="{Binding IsDirectory, 
+                                                   Converter={StaticResource TypeConverter}}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Border>
+        </Grid>
+    </DockPanel>
 </Window>
