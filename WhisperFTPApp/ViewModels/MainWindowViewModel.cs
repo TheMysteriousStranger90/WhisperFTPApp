@@ -47,6 +47,14 @@ public class MainWindowViewModel : ReactiveObject {
         get => _port;
         set => this.RaiseAndSetIfChanged(ref _port, value);
     }
+    
+    private bool _isConnected;
+    
+    public bool IsConnected
+    {
+        get => _isConnected;
+        set => this.RaiseAndSetIfChanged(ref _isConnected, value);
+    }
 
     public DriveInfo SelectedDrive
     {
@@ -217,7 +225,6 @@ public class MainWindowViewModel : ReactiveObject {
         NavigateUpCommand = ReactiveCommand.CreateFromTask(NavigateUpAsync);
         NavigateToFolderCommand = ReactiveCommand.CreateFromTask<FileSystemItem>(NavigateToFolderAsync);
         SaveConnectionCommand = ReactiveCommand.CreateFromTask(SaveSuccessfulConnection);
-        ConnectCommand = ReactiveCommand.CreateFromTask(ConnectToFtpAsync);
         UploadCommand = ReactiveCommand.CreateFromTask(UploadFileAsync);
         BrowseCommand = ReactiveCommand.Create(BrowseFiles);
         DownloadCommand = ReactiveCommand.CreateFromTask(DownloadFileAsync);
@@ -226,7 +233,13 @@ public class MainWindowViewModel : ReactiveObject {
         NavigateLocalUpCommand = ReactiveCommand.Create(NavigateLocalUp);
         RefreshLocalCommand = ReactiveCommand.Create(RefreshLocalFiles);
         NavigateToLocalDirectoryCommand = ReactiveCommand.Create<FileSystemItem>(NavigateToLocalDirectory);
-        DisconnectCommand = ReactiveCommand.CreateFromTask(DisconnectAsync);
+        ConnectCommand = ReactiveCommand.CreateFromTask(
+            ConnectToFtpAsync,
+            this.WhenAnyValue(x => x.IsConnected, connected => !connected));
+            
+        DisconnectCommand = ReactiveCommand.CreateFromTask(
+            DisconnectAsync,
+            this.WhenAnyValue(x => x.IsConnected));
         CleanCommand = ReactiveCommand.Create(CleanFields);
         LocalFiles = new ObservableCollection<string>();
         FtpFiles = new ObservableCollection<string>();
@@ -317,6 +330,7 @@ public class MainWindowViewModel : ReactiveObject {
             bool isConnected = await _ftpService.ConnectAsync(configuration);
             if (isConnected)
             {
+                IsConnected = true;
                 StatusMessage = "Connected successfully";
                 var items = await _ftpService.ListDirectoryAsync(configuration);
                 FtpItems = new ObservableCollection<FileSystemItem>(items);
@@ -326,11 +340,13 @@ public class MainWindowViewModel : ReactiveObject {
             }
             else
             {
+                IsConnected = false;
                 StatusMessage = "Failed to connect. Please check your credentials.";
             }
         }
         catch (Exception ex)
         {
+            IsConnected = false;
             StatusMessage = $"Connection error: {ex.Message}";
             FtpItems?.Clear();
             UpdateRemoteStats();
@@ -641,6 +657,7 @@ public class MainWindowViewModel : ReactiveObject {
             await _ftpService.DisconnectAsync();
             FtpItems?.Clear();
             UpdateRemoteStats();
+            IsConnected = false;
             StatusMessage = "Disconnected from FTP server";
         }
         catch (Exception ex)
@@ -655,8 +672,6 @@ public class MainWindowViewModel : ReactiveObject {
         Username = string.Empty;
         Password = string.Empty;
         Port = "21";
-        FtpItems?.Clear();
-        UpdateRemoteStats();
         StatusMessage = "Fields cleared";
     }
 }

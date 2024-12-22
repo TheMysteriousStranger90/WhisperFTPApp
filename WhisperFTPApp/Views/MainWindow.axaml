@@ -81,13 +81,15 @@
                 <TextBox Width="60" 
                          Watermark="Port" 
                          Text="{Binding Port}"/>
-                <Button Command="{Binding ConnectCommand}">
+                <Button Command="{Binding ConnectCommand}"
+                        IsEnabled="{Binding !IsConnected}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <PathIcon Data="{StaticResource RefreshIcon}"/>
                         <TextBlock Text="Connect"/>
                     </StackPanel>
                 </Button>
-                <Button Command="{Binding DisconnectCommand}">
+                <Button Command="{Binding DisconnectCommand}"
+                        IsEnabled="{Binding IsConnected}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <PathIcon Data="{StaticResource DisconnectIcon}"/>
                         <TextBlock Text="Disconnect"/>
