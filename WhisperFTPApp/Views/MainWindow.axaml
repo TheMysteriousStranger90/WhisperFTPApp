@@ -7,9 +7,13 @@
         mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
         x:Class="WhisperFTPApp.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/icon.ico"
         Opacity="0.9"
         Title="WhisperFTP">
+    
+    <Window.Background>
+        <ImageBrush Stretch="UniformToFill" Source="/Assets/Image (3).jpg" />
+    </Window.Background>
 
     <Window.Resources>
         <conv:FtpTypeConverter x:Key="TypeConverter" />
