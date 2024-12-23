@@ -17,7 +17,8 @@ using WhisperFTPApp.Services.Interfaces;
 
 namespace WhisperFTPApp.ViewModels;
 
-public class MainWindowViewModel : ReactiveObject {
+public class MainWindowViewModel : ReactiveObject
+{
     private readonly ISettingsService _settingsService;
     private string _selectedPath;
     private string _ftpAddress;
@@ -47,9 +48,9 @@ public class MainWindowViewModel : ReactiveObject {
         get => _port;
         set => this.RaiseAndSetIfChanged(ref _port, value);
     }
-    
+
     private bool _isConnected;
-    
+
     public bool IsConnected
     {
         get => _isConnected;
@@ -214,6 +215,22 @@ public class MainWindowViewModel : ReactiveObject {
     public ReactiveCommand<Unit, Unit> SaveConnectionCommand { get; }
     public ReactiveCommand<Unit, Unit> DisconnectCommand { get; }
     public ReactiveCommand<Unit, Unit> CleanCommand { get; }
+    private FtpConnectionEntity _selectedRecentConnection;
+    public ObservableCollection<FtpConnectionEntity> RecentConnections => _recentConnections;
+    public ReactiveCommand<Unit, Unit> ShowRecentConnectionsCommand { get; }
+
+    public FtpConnectionEntity SelectedRecentConnection
+    {
+        get => _selectedRecentConnection;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedRecentConnection, value);
+            if (value != null)
+            {
+                _ = SwitchConnectionAsync(value);
+            }
+        }
+    }
 
     public MainWindowViewModel(IFtpService ftpService, ISettingsService settingsService)
     {
@@ -236,7 +253,7 @@ public class MainWindowViewModel : ReactiveObject {
         ConnectCommand = ReactiveCommand.CreateFromTask(
             ConnectToFtpAsync,
             this.WhenAnyValue(x => x.IsConnected, connected => !connected));
-            
+
         DisconnectCommand = ReactiveCommand.CreateFromTask(
             DisconnectAsync,
             this.WhenAnyValue(x => x.IsConnected));
@@ -252,6 +269,7 @@ public class MainWindowViewModel : ReactiveObject {
                 _ = RefreshDirectoryAsync();
             }
         });
+        ShowRecentConnectionsCommand = ReactiveCommand.Create(() => { });
         LocalFileStats = new FileStats();
         RemoteFileStats = new FileStats();
 
@@ -335,7 +353,7 @@ public class MainWindowViewModel : ReactiveObject {
                 var items = await _ftpService.ListDirectoryAsync(configuration);
                 FtpItems = new ObservableCollection<FileSystemItem>(items);
                 UpdateRemoteStats();
-                
+
                 await SaveSuccessfulConnection();
             }
             else
@@ -558,13 +576,14 @@ public class MainWindowViewModel : ReactiveObject {
                 Name = FtpAddress,
                 Address = FtpAddress,
                 Username = Username,
+                Password = Password,
                 LastUsed = DateTime.UtcNow
             };
 
             var connections = _recentConnections.ToList();
-            var existing = connections.FirstOrDefault(c => 
+            var existing = connections.FirstOrDefault(c =>
                 c.Address.Equals(connection.Address, StringComparison.OrdinalIgnoreCase));
-        
+
             if (existing != null)
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Updating existing connection");
@@ -573,7 +592,7 @@ public class MainWindowViewModel : ReactiveObject {
 
             connections.Add(connection);
             var toSave = connections.OrderByDescending(c => c.LastUsed).Take(10).ToList();
-        
+
             await _settingsService.SaveConnectionsAsync(toSave);
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Connection saved successfully");
             LoadRecentConnections();
@@ -586,7 +605,7 @@ public class MainWindowViewModel : ReactiveObject {
 
     private async void LoadRecentConnections()
     {
-        try 
+        try
         {
             var connections = await _settingsService.LoadConnectionsAsync() ?? new List<FtpConnectionEntity>();
             _recentConnections.Clear();
@@ -649,7 +668,7 @@ public class MainWindowViewModel : ReactiveObject {
             NavigateToLocalDirectory(parent.FullName);
         }
     }
-    
+
     private async Task DisconnectAsync()
     {
         try
@@ -673,5 +692,29 @@ public class MainWindowViewModel : ReactiveObject {
         Password = string.Empty;
         Port = "21";
         StatusMessage = "Fields cleared";
+    }
+
+    private async Task SwitchConnectionAsync(FtpConnectionEntity connection)
+    {
+        try
+        {
+            if (IsConnected)
+            {
+                await DisconnectAsync();
+            }
+
+            FtpAddress = connection.Address;
+            Username = connection.Username;
+            Password = connection.Password;
+            await ConnectToFtpAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error switching connection: {ex.Message}";
+        }
+        finally
+        {
+            SelectedRecentConnection = null;
+        }
     }
 }

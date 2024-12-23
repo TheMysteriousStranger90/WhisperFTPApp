@@ -20,17 +20,41 @@ public class SettingsService : ISettingsService
 
     public async Task SaveConnectionsAsync(List<FtpConnectionEntity> connections)
     {
+        using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Saving {connections.Count} connections to database");
-            _context.FtpConnections.RemoveRange(_context.FtpConnections);
-            await _context.FtpConnections.AddRangeAsync(connections);
-            await _context.SaveChangesAsync();
+            
+            var existing = await _context.FtpConnections.ToListAsync();
+            if (existing.Any())
+            {
+                _context.FtpConnections.RemoveRange(existing);
+                await _context.SaveChangesAsync();
+            }
+            
+            foreach (var connection in connections)
+            {
+                var newConnection = new FtpConnectionEntity
+                {
+                    Name = connection.Name,
+                    Address = connection.Address,
+                    Username = connection.Username,
+                    Password = connection.Password,
+                    LastUsed = connection.LastUsed
+                };
+                
+                _context.FtpConnections.Add(newConnection);
+                await _context.SaveChangesAsync();
+            }
+
+            await transaction.CommitAsync();
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Connections saved successfully");
         }
         catch (Exception ex)
         {
+            await transaction.RollbackAsync();
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Database error: {ex.Message}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stack trace: {ex.StackTrace}");
             throw;
         }
     }
@@ -43,6 +67,7 @@ public class SettingsService : ISettingsService
                 Name = e.Name,
                 Address = e.Address,
                 Username = e.Username,
+                Password = e.Password,
                 LastUsed = e.LastUsed
             })
             .ToListAsync();

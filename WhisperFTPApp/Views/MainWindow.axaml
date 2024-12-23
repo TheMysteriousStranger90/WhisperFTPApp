@@ -101,6 +101,26 @@
                         <TextBlock Text="Clean"/>
                     </StackPanel>
                 </Button>
+                <Button Command="{Binding ShowRecentConnectionsCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <PathIcon Data="{StaticResource ListOfConnections}"/>
+                    </StackPanel>
+                    <Button.Flyout>
+                        <Flyout>
+                            <ListBox ItemsSource="{Binding RecentConnections}"
+                                     SelectionMode="Single"
+                                     SelectedItem="{Binding SelectedRecentConnection}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock>
+                                            <Run Text="{Binding Address}"/>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
             </StackPanel>
         </Border>
 
