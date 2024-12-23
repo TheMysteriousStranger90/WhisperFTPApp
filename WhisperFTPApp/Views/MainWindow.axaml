@@ -81,13 +81,15 @@
                 <TextBox Width="60" 
                          Watermark="Port" 
                          Text="{Binding Port}"/>
-                <Button Command="{Binding ConnectCommand}">
+                <Button Command="{Binding ConnectCommand}"
+                        IsEnabled="{Binding !IsConnected}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <PathIcon Data="{StaticResource RefreshIcon}"/>
                         <TextBlock Text="Connect"/>
                     </StackPanel>
                 </Button>
-                <Button Command="{Binding DisconnectCommand}">
+                <Button Command="{Binding DisconnectCommand}"
+                        IsEnabled="{Binding IsConnected}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <PathIcon Data="{StaticResource DisconnectIcon}"/>
                         <TextBlock Text="Disconnect"/>
@@ -98,6 +100,26 @@
                         <PathIcon Data="{StaticResource CleanIcon}"/>
                         <TextBlock Text="Clean"/>
                     </StackPanel>
+                </Button>
+                <Button Command="{Binding ShowRecentConnectionsCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <PathIcon Data="{StaticResource ListOfConnections}"/>
+                    </StackPanel>
+                    <Button.Flyout>
+                        <Flyout>
+                            <ListBox ItemsSource="{Binding RecentConnections}"
+                                     SelectionMode="Single"
+                                     SelectedItem="{Binding SelectedRecentConnection}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock>
+                                            <Run Text="{Binding Address}"/>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Flyout>
+                    </Button.Flyout>
                 </Button>
             </StackPanel>
         </Border>

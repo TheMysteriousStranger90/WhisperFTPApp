@@ -20,6 +20,7 @@ namespace WhisperFTPApp.Migrations
                     Name = table.Column<string>(type: "TEXT", nullable: false),
                     Address = table.Column<string>(type: "TEXT", nullable: false),
                     Username = table.Column<string>(type: "TEXT", nullable: false),
+                    Password = table.Column<string>(type: "TEXT", nullable: false),
                     LastUsed = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>

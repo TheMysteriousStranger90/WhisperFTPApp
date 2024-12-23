@@ -14,6 +14,13 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.Entity<FtpConnectionEntity>().ToTable("FtpConnections");
+        modelBuilder.Entity<FtpConnectionEntity>(entity =>
+        {
+            entity.ToTable("FtpConnections");
+            entity.Property(e => e.Name).IsRequired(true);
+            entity.Property(e => e.Address).IsRequired(true);
+            entity.Property(e => e.Username).IsRequired(true);
+            entity.Property(e => e.Password).IsRequired(true);
+        });
     }
 }
