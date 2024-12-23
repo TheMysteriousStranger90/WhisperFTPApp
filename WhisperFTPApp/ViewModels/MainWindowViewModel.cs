@@ -416,14 +416,26 @@ public class MainWindowViewModel : ReactiveObject
         IsTransferring = true;
         try
         {
-            if (SelectedFtpItem == null || string.IsNullOrEmpty(SelectedPath)) return;
+            if (SelectedFtpItem == null)
+            {
+                StatusMessage = "No item selected for download";
+                return;
+            }
 
-            StatusMessage = $"Downloading {SelectedFtpItem.Name}...";
             var configuration = CreateConfiguration();
-            var localPath = Path.Combine(SelectedPath, SelectedFtpItem.Name);
             var progress = new Progress<double>(p => TransferProgress = p);
 
-            await _ftpService.DownloadFileAsync(configuration, SelectedFtpItem.FullPath, localPath, progress);
+            if (SelectedFtpItem.IsDirectory)
+            {
+                await DownloadDirectoryAsync(configuration, SelectedFtpItem, LocalCurrentPath, progress);
+            }
+            else
+            {
+                var localPath = Path.Combine(LocalCurrentPath, SelectedFtpItem.Name);
+                StatusMessage = $"Downloading {SelectedFtpItem.Name}...";
+                await _ftpService.DownloadFileAsync(configuration, SelectedFtpItem.FullPath, localPath, progress);
+            }
+
             await RefreshLocalFiles();
             StatusMessage = "Download complete";
         }
@@ -434,6 +446,34 @@ public class MainWindowViewModel : ReactiveObject
         finally
         {
             IsTransferring = false;
+            TransferProgress = 0;
+        }
+    }
+
+    private async Task DownloadDirectoryAsync(FtpConfiguration config, FileSystemItem directory, string localPath, IProgress<double> progress)
+    {
+        var targetPath = Path.Combine(localPath, directory.Name);
+        Directory.CreateDirectory(targetPath);
+
+        var items = await _ftpService.ListDirectoryAsync(config, directory.FullPath);
+        var totalItems = items.Count();
+        var currentItem = 0;
+
+        foreach (var item in items)
+        {
+            if (item.IsDirectory)
+            {
+                await DownloadDirectoryAsync(config, item, targetPath, progress);
+            }
+            else
+            {
+                var itemPath = Path.Combine(targetPath, item.Name);
+                StatusMessage = $"Downloading {item.Name}...";
+                await _ftpService.DownloadFileAsync(config, item.FullPath, itemPath, progress);
+            }
+
+            currentItem++;
+            progress.Report((double)currentItem / totalItems * 100);
         }
     }
 
