@@ -11,7 +11,7 @@ using WhisperFTPApp.Data;
 namespace WhisperFTPApp.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20241223062148_InitialCreate")]
+    [Migration("20241223070922_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
