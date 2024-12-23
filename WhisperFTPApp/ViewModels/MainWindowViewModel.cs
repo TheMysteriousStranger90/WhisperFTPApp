@@ -56,6 +56,13 @@ public class MainWindowViewModel : ReactiveObject
         get => _isConnected;
         set => this.RaiseAndSetIfChanged(ref _isConnected, value);
     }
+    
+    private bool _isTransferring;
+    public bool IsTransferring 
+    {
+        get => _isTransferring;
+        set => this.RaiseAndSetIfChanged(ref _isTransferring, value);
+    }
 
     public DriveInfo SelectedDrive
     {
@@ -318,6 +325,7 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task ConnectToFtpAsync()
     {
+        IsTransferring = true;
         try
         {
             StatusMessage = "Connecting to FTP server...";
@@ -369,10 +377,15 @@ public class MainWindowViewModel : ReactiveObject
             FtpItems?.Clear();
             UpdateRemoteStats();
         }
+        finally
+        {
+            IsTransferring = false;
+        }
     }
 
     private async Task UploadFileAsync()
     {
+        IsTransferring = true;
         try
         {
             var configuration = CreateConfiguration();
@@ -392,10 +405,15 @@ public class MainWindowViewModel : ReactiveObject
         {
             StatusMessage = $"Upload failed: {ex.Message}";
         }
+        finally
+        {
+            IsTransferring = false;
+        }
     }
 
     private async Task DownloadFileAsync()
     {
+        IsTransferring = true;
         try
         {
             if (SelectedFtpItem == null || string.IsNullOrEmpty(SelectedPath)) return;
@@ -413,10 +431,15 @@ public class MainWindowViewModel : ReactiveObject
         {
             StatusMessage = $"Download failed: {ex.Message}";
         }
+        finally
+        {
+            IsTransferring = false;
+        }
     }
 
     private async Task DeleteFileAsync()
     {
+        IsTransferring = true;
         try
         {
             if (SelectedFtpItem == null) return;
@@ -430,6 +453,10 @@ public class MainWindowViewModel : ReactiveObject
         catch (Exception ex)
         {
             StatusMessage = $"Delete failed: {ex.Message}";
+        }
+        finally
+        {
+            IsTransferring = false;
         }
     }
 

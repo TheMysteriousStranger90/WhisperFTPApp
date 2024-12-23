@@ -110,7 +110,25 @@
         <!-- Status Bar -->
         <Border Classes="panel" DockPanel.Dock="Bottom" Padding="16,8" Margin="0,16,0,0">
             <StackPanel Orientation="Horizontal" Spacing="16">
-                <ProgressBar Width="200" Height="4" Value="{Binding TransferProgress}" />
+                <Panel Width="24" Height="24" IsVisible="{Binding IsTransferring}">
+                    <PathIcon Data="{StaticResource RefreshIcon}">
+                        <PathIcon.Styles>
+                            <Style Selector="PathIcon">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:1" 
+                                               IterationCount="Infinite">
+                                        <KeyFrame Cue="0%">
+                                            <Setter Property="RotateTransform.Angle" Value="0"/>
+                                        </KeyFrame>
+                                        <KeyFrame Cue="100%">
+                                            <Setter Property="RotateTransform.Angle" Value="360"/>
+                                        </KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </PathIcon.Styles>
+                    </PathIcon>
+                </Panel>
                 <TextBlock Text="{Binding StatusMessage}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </StackPanel>
         </Border>
