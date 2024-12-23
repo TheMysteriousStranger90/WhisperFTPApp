@@ -1,0 +1,47 @@
+﻿<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Design.PreviewWith>
+        <Border Padding="20">
+            <!-- Add Controls for Previewer Here -->
+        </Border>
+    </Design.PreviewWith>
+
+    <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
+
+    <Style Selector="Button">
+        <Setter Property="Background" Value="#222" />
+        <Setter Property="Foreground" Value="#FFF" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+
+    <Style Selector="Button:pointerover">
+        <Setter Property="Background" Value="#000" />
+    </Style>
+
+    <Style Selector="TextBox">
+        <Setter Property="Height" Value="32" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <Style Selector="DataGrid">
+        <Setter Property="BorderThickness" Value="2" />
+        <Setter Property="BorderBrush" Value="#222" />
+        <Setter Property="RowBackground" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+
+    <Style Selector="ListBox">
+        <Setter Property="BorderThickness" Value="4" />
+        <Setter Property="BorderBrush" Value="#E1E1E1" />
+        <Setter Property="Background" Value="#6f0028" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+
+    <Style Selector="Border.panel">
+        <Setter Property="Background" Value="#56001f" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="BoxShadow" Value="0 2 4 0 #20000000" />
+    </Style>
+</Styles>

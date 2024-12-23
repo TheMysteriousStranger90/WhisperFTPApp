@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="WhisperFTPApp.App"
              xmlns:local="using:WhisperFTPApp"
-             RequestedThemeVariant="Default">
+             RequestedThemeVariant="Dark">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
              <Application.DataTemplates>
@@ -10,37 +10,6 @@
              </Application.DataTemplates>
   
              <Application.Styles>
-                 <FluentTheme/>
-                 <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
-        
-                 <Style Selector="Button">
-                     <Setter Property="Padding" Value="10 5"/>
-                     <Setter Property="CornerRadius" Value="4"/>
-                     <Setter Property="Background" Value="#6f0028"/>
-                     <Setter Property="Foreground" Value="#E1E1E1"/>
-                 </Style>
-        
-                 <Style Selector="Button:pointerover">
-                     <Setter Property="Background" Value="#6f0028"/>
-                 </Style>
-        
-                 <Style Selector="TextBox">
-                     <Setter Property="CornerRadius" Value="4"/>
-                     <Setter Property="Height" Value="32"/>
-                 </Style>
-        
-                 <Style Selector="DataGrid">
-                     <Setter Property="BorderThickness" Value="2"/>
-                     <Setter Property="BorderBrush" Value="#222"/>
-                     <Setter Property="RowBackground" Value="Transparent"/>
-                     <Setter Property="CornerRadius" Value="4"/>
-                 </Style>
-        
-                 <Style Selector="ListBox">
-                     <Setter Property="BorderThickness" Value="4"/>
-                     <Setter Property="BorderBrush" Value="#E1E1E1"/>
-                     <Setter Property="Background" Value="#6f0028"/>
-                     <Setter Property="CornerRadius" Value="8"/>
-                 </Style>
+                 <FluentTheme />
              </Application.Styles>
 </Application>
