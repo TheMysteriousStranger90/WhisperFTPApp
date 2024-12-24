@@ -228,6 +228,7 @@ public class MainWindowViewModel : ReactiveObject
     public ObservableCollection<FtpConnectionEntity> RecentConnections => _recentConnections;
     public ReactiveCommand<Unit, Unit> ShowRecentConnectionsCommand { get; }
     public ReactiveCommand<FtpConnectionEntity, Unit> DeleteConnectionCommand { get; }
+    public ReactiveCommand<Unit, Unit> ShowMainViewCommand { get; }
 
     public FtpConnectionEntity SelectedRecentConnection
     {
@@ -281,6 +282,7 @@ public class MainWindowViewModel : ReactiveObject
         });
         ShowRecentConnectionsCommand = ReactiveCommand.Create(() => { });
         DeleteConnectionCommand = ReactiveCommand.CreateFromTask<FtpConnectionEntity>(DeleteConnectionAsync);
+        ShowMainViewCommand = ReactiveCommand.Create(() => { });
         LocalFileStats = new FileStats();
         RemoteFileStats = new FileStats();
 
