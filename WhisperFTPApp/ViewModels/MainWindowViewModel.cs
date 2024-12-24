@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reactive;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -56,9 +57,10 @@ public class MainWindowViewModel : ReactiveObject
         get => _isConnected;
         set => this.RaiseAndSetIfChanged(ref _isConnected, value);
     }
-    
+
     private bool _isTransferring;
-    public bool IsTransferring 
+
+    public bool IsTransferring
     {
         get => _isTransferring;
         set => this.RaiseAndSetIfChanged(ref _isTransferring, value);
@@ -388,18 +390,32 @@ public class MainWindowViewModel : ReactiveObject
         IsTransferring = true;
         try
         {
+            if (SelectedLocalItem == null)
+            {
+                StatusMessage = "No item selected for upload";
+                return;
+            }
+
             var configuration = CreateConfiguration();
             var progress = new Progress<double>(p => TransferProgress = p);
 
-            foreach (var file in LocalFiles)
+            string targetDirectory = SelectedFtpItem?.IsDirectory == true
+                ? SelectedFtpItem.FullPath
+                : CurrentDirectory;
+
+            if (SelectedLocalItem.IsDirectory)
             {
-                StatusMessage = $"Uploading {Path.GetFileName(file)}...";
-                var fileName = Path.GetFileName(file);
-                await _ftpService.UploadFileAsync(configuration, file, fileName, progress);
+                await UploadDirectoryAsync(configuration, SelectedLocalItem, targetDirectory, progress);
+            }
+            else
+            {
+                var remotePath = Path.Combine(targetDirectory, SelectedLocalItem.Name).Replace('\\', '/');
+                StatusMessage = $"Uploading {SelectedLocalItem.Name}...";
+                await _ftpService.UploadFileAsync(configuration, SelectedLocalItem.FullPath, remotePath, progress);
             }
 
-            StatusMessage = "Upload complete";
             await RefreshDirectoryAsync();
+            StatusMessage = "Upload complete";
         }
         catch (Exception ex)
         {
@@ -408,6 +424,47 @@ public class MainWindowViewModel : ReactiveObject
         finally
         {
             IsTransferring = false;
+            TransferProgress = 0;
+        }
+    }
+
+    private async Task UploadDirectoryAsync(FtpConfiguration config, FileSystemItem directory, string remotePath,
+        IProgress<double> progress)
+    {
+        var targetPath = Path.Combine(remotePath, directory.Name).Replace('\\', '/');
+
+        var createDirRequest =
+            (FtpWebRequest)WebRequest.Create($"{config.FtpAddress.TrimEnd('/')}/{targetPath.TrimStart('/')}");
+        createDirRequest.Method = WebRequestMethods.Ftp.MakeDirectory;
+        createDirRequest.Credentials = new NetworkCredential(config.Username, config.Password);
+        await createDirRequest.GetResponseAsync();
+
+        var files = Directory.GetFiles(directory.FullPath);
+        var dirs = Directory.GetDirectories(directory.FullPath);
+        var totalItems = files.Length + dirs.Length;
+        var currentItem = 0;
+
+        foreach (var file in files)
+        {
+            var fileName = Path.GetFileName(file);
+            var remoteFilePath = Path.Combine(targetPath, fileName).Replace('\\', '/');
+            StatusMessage = $"Uploading {fileName}...";
+            await _ftpService.UploadFileAsync(config, file, remoteFilePath, progress);
+            currentItem++;
+            progress.Report((double)currentItem / totalItems * 100);
+        }
+
+        foreach (var dir in dirs)
+        {
+            var subDir = new FileSystemItem
+            {
+                Name = Path.GetFileName(dir),
+                FullPath = dir,
+                IsDirectory = true
+            };
+            await UploadDirectoryAsync(config, subDir, targetPath, progress);
+            currentItem++;
+            progress.Report((double)currentItem / totalItems * 100);
         }
     }
 
@@ -450,7 +507,8 @@ public class MainWindowViewModel : ReactiveObject
         }
     }
 
-    private async Task DownloadDirectoryAsync(FtpConfiguration config, FileSystemItem directory, string localPath, IProgress<double> progress)
+    private async Task DownloadDirectoryAsync(FtpConfiguration config, FileSystemItem directory, string localPath,
+        IProgress<double> progress)
     {
         var targetPath = Path.Combine(localPath, directory.Name);
         Directory.CreateDirectory(targetPath);
