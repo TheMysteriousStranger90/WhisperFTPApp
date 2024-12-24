@@ -227,6 +227,7 @@ public class MainWindowViewModel : ReactiveObject
     private FtpConnectionEntity _selectedRecentConnection;
     public ObservableCollection<FtpConnectionEntity> RecentConnections => _recentConnections;
     public ReactiveCommand<Unit, Unit> ShowRecentConnectionsCommand { get; }
+    public ReactiveCommand<FtpConnectionEntity, Unit> DeleteConnectionCommand { get; }
 
     public FtpConnectionEntity SelectedRecentConnection
     {
@@ -279,6 +280,7 @@ public class MainWindowViewModel : ReactiveObject
             }
         });
         ShowRecentConnectionsCommand = ReactiveCommand.Create(() => { });
+        DeleteConnectionCommand = ReactiveCommand.CreateFromTask<FtpConnectionEntity>(DeleteConnectionAsync);
         LocalFileStats = new FileStats();
         RemoteFileStats = new FileStats();
 
@@ -840,6 +842,20 @@ public class MainWindowViewModel : ReactiveObject
         finally
         {
             SelectedRecentConnection = null;
+        }
+    }
+
+    private async Task DeleteConnectionAsync(FtpConnectionEntity connection)
+    {
+        try
+        {
+            await _settingsService.DeleteConnectionAsync(connection);
+            _recentConnections.Remove(connection);
+            StatusMessage = "Connection removed from history";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error removing connection: {ex.Message}";
         }
     }
 }

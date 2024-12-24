@@ -99,9 +99,19 @@
                                      SelectedItem="{Binding SelectedRecentConnection}">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock>
-                                            <Run Text="{Binding Address}" />
-                                        </TextBlock>
+                                        <Grid ColumnDefinitions="*, Auto">
+                                            <TextBlock Text="{Binding Address}" 
+                                                       VerticalAlignment="Center"/>
+                                            <Button Grid.Column="1"
+                                                    Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).DeleteConnectionCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Background="Transparent"
+                                                    Margin="8,0,0,0">
+                                                <PathIcon Data="{StaticResource DeleteIcon}"
+                                                          Width="16"
+                                                          Height="16"/>
+                                            </Button>
+                                        </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>

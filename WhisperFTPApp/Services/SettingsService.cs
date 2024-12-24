@@ -72,4 +72,16 @@ public class SettingsService : ISettingsService
             })
             .ToListAsync();
     }
+    
+    public async Task DeleteConnectionAsync(FtpConnectionEntity connection)
+    {
+        var entity = await _context.FtpConnections
+            .FirstOrDefaultAsync(x => x.Address == connection.Address);
+    
+        if (entity != null)
+        {
+            _context.FtpConnections.Remove(entity);
+            await _context.SaveChangesAsync();
+        }
+    }
 }
