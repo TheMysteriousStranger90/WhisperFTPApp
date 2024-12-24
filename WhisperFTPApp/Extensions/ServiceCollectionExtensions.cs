@@ -23,10 +23,13 @@ public static class ServiceCollectionExtensions
     public static void AddCommonViewModels(this IServiceCollection collection)
     {
         collection.AddTransient<MainWindowViewModel>();
+        collection.AddTransient<SettingsWindowViewModel>();
     }
     
     public static void AddCommonWindows(this IServiceCollection collection)
     {
         collection.AddTransient<MainWindow>();
+        collection.AddTransient<MainView>();
+        collection.AddTransient<SettingsView>();
     }
 }
