@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using WhisperFTPApp.Configurations;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Services.Interfaces;
+using System.Globalization;
 
 namespace WhisperFTPApp.Services;
 
@@ -42,7 +43,7 @@ public class FtpService : IFtpService
                 {
                     return IsAuthenticationError(ex);
                 }
-                
+
                 int delay = BaseDelay * (int)Math.Pow(2, attempt - 1);
                 await Task.Delay(delay);
             }
@@ -57,7 +58,7 @@ public class FtpService : IFtpService
         {
             Port = configuration.Port
         };
-        
+
         _currentRequest = (FtpWebRequest)WebRequest.Create(uriBuilder.Uri);
         _currentRequest.Method = WebRequestMethods.Ftp.ListDirectory;
         _currentRequest.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
@@ -70,7 +71,7 @@ public class FtpService : IFtpService
                    response.StatusCode == FtpStatusCode.AccountNeeded;
         }
     }
-        
+
     public async Task DisconnectAsync()
     {
         if (_currentRequest != null)
@@ -198,16 +199,57 @@ public class FtpService : IFtpService
 
     private FileSystemItem ParseFtpListItem(string line, string currentPath)
     {
-        var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 4) return null;
-
-        return new FileSystemItem
+        try
         {
-            Name = parts[^1],
-            FullPath = $"{currentPath.TrimEnd('/')}/{parts[^1]}",
-            IsDirectory = line.StartsWith('d'),
-            Size = long.TryParse(parts[^5], out var size) ? size : 0,
-            Modified = DateTime.Parse($"{parts[^4]} {parts[^3]} {parts[^2]}")
-        };
+            var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 4) return null;
+
+            DateTime modifiedDate;
+            var dateString = $"{parts[^4]} {parts[^3]} {parts[^2]}";
+
+            var formats = new[]
+            {
+                "MMM dd yyyy",
+                "MMM dd HH:mm",
+                "MMM dd hh:mm",
+                "yyyy-MM-dd HH:mm",
+                "dd MMM yyyy",
+                "dd MMM HH:mm"
+            };
+
+            if (!DateTime.TryParseExact(dateString,
+                    formats,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out modifiedDate))
+            {
+                var monthDay = $"{parts[^4]} {parts[^3]}";
+                if (DateTime.TryParseExact(monthDay,
+                        new[] { "MMM dd", "dd MMM" },
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out var partialDate))
+                {
+                    modifiedDate = new DateTime(DateTime.Now.Year, partialDate.Month, partialDate.Day);
+                }
+                else
+                {
+                    modifiedDate = DateTime.Now;
+                }
+            }
+
+            return new FileSystemItem
+            {
+                Name = parts[^1],
+                FullPath = $"{currentPath.TrimEnd('/')}/{parts[^1]}",
+                IsDirectory = line.StartsWith('d'),
+                Size = long.TryParse(parts[^5], out var size) ? size : 0,
+                Modified = modifiedDate
+            };
+        }
+        catch (Exception ex)
+        {
+            return null;
+        }
     }
 }
