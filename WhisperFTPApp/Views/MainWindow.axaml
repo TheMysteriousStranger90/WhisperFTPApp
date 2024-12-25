@@ -3,6 +3,7 @@
         xmlns:vm="using:WhisperFTPApp.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:global="clr-namespace:WhisperFTPApp.Converters"
         mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
         x:Class="WhisperFTPApp.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -11,7 +12,7 @@
         Title="WhisperFTP">
 
     <Window.Background>
-        <ImageBrush Stretch="UniformToFill" Source="{Binding BackgroundPath, FallbackValue='/Assets/Image (3).jpg'}" />
+        <Binding Path="BackgroundPath" Converter="{x:Static global:WindowBackgroundConverter.Instance}" />
     </Window.Background>
 
     <Window.Styles>

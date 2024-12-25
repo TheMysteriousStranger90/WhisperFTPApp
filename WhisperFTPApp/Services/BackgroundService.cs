@@ -38,9 +38,10 @@ public class BackgroundService : IBackgroundService
     {
         try
         {
-            Console.WriteLine($"[BackgroundService] Changing background to: {path}");
-            await _settingsService.SaveBackgroundSettingAsync(path);
-            _backgroundChanged.OnNext(path);
+            var dbPath = path.StartsWith("avares://") ? path : $"avares://WhisperFTPApp{path}";
+            Console.WriteLine($"[BackgroundService] Changing background to: {dbPath}");
+            await _settingsService.SaveBackgroundSettingAsync(dbPath);
+            _backgroundChanged.OnNext(dbPath);
         }
         catch (Exception ex)
         {
