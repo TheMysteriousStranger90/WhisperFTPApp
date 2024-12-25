@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
+using WhisperFTPApp.Logger;
 using WhisperFTPApp.Services.Interfaces;
 
 namespace WhisperFTPApp.Services;
@@ -25,12 +26,11 @@ public class BackgroundService : IBackgroundService
         try
         {
             var background = await _settingsService.LoadBackgroundSettingAsync();
-            Console.WriteLine($"[BackgroundService] Loaded initial background: {background}");
             _backgroundChanged.OnNext(background);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[BackgroundService] Error loading background: {ex.Message}");
+            StaticFileLogger.LogError($"[BackgroundService] Error loading background: {ex.Message}");
         }
     }
 
@@ -39,13 +39,13 @@ public class BackgroundService : IBackgroundService
         try
         {
             var dbPath = path.StartsWith("avares://") ? path : $"avares://WhisperFTPApp{path}";
-            Console.WriteLine($"[BackgroundService] Changing background to: {dbPath}");
+            StaticFileLogger.LogInformation($"[BackgroundService] Changing background to: {dbPath}");
             await _settingsService.SaveBackgroundSettingAsync(dbPath);
             _backgroundChanged.OnNext(dbPath);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[BackgroundService] Error changing background: {ex.Message}");
+            StaticFileLogger.LogError($"[BackgroundService] Error changing background: {ex.Message}");
         }
     }
 }

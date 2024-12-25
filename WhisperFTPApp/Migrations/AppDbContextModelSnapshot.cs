@@ -45,6 +45,17 @@ namespace WhisperFTPApp.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("FtpConnections", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Address = "ftp://demo.wftpserver.com",
+                            LastUsed = new DateTime(2024, 12, 25, 16, 6, 48, 764, DateTimeKind.Local).AddTicks(9433),
+                            Name = "ftp://demo.wftpserver.com",
+                            Password = "demo",
+                            Username = "demo"
+                        });
                 });
 
             modelBuilder.Entity("WhisperFTPApp.Models.SettingsEntity", b =>
@@ -60,6 +71,13 @@ namespace WhisperFTPApp.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Settings", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            BackgroundPathImage = "/Assets/Image (3).jpg"
+                        });
                 });
 #pragma warning restore 612, 618
         }

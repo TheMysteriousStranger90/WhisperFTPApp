@@ -9,7 +9,6 @@ public interface ISettingsService
     Task SaveConnectionsAsync(List<FtpConnectionEntity> connections);
     Task<List<FtpConnectionEntity>> LoadConnectionsAsync();
     Task DeleteConnectionAsync(FtpConnectionEntity connection);
-    
     Task SaveBackgroundSettingAsync(string backgroundPath);
     Task<string> LoadBackgroundSettingAsync();
 }

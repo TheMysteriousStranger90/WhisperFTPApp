@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using WhisperFTPApp.Data;
+using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Services.Interfaces;
 
@@ -23,7 +24,7 @@ public class SettingsService : ISettingsService
         using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Saving {connections.Count} connections to database");
+            StaticFileLogger.LogInformation($"[{DateTime.Now:HH:mm:ss}] Saving {connections.Count} connections to database");
             
             var existing = await _context.FtpConnections.ToListAsync();
             if (existing.Any())
@@ -48,13 +49,13 @@ public class SettingsService : ISettingsService
             }
 
             await transaction.CommitAsync();
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Connections saved successfully");
+            StaticFileLogger.LogInformation($"[{DateTime.Now:HH:mm:ss}] Connections saved successfully");
         }
         catch (Exception ex)
         {
             await transaction.RollbackAsync();
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Database error: {ex.Message}");
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stack trace: {ex.StackTrace}");
+            StaticFileLogger.LogError($"[{DateTime.Now:HH:mm:ss}] Database error: {ex.Message}");
+            StaticFileLogger.LogError($"[{DateTime.Now:HH:mm:ss}] Stack trace: {ex.StackTrace}");
             throw;
         }
     }

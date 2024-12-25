@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace WhisperFTPApp.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class Initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -40,6 +40,16 @@ namespace WhisperFTPApp.Migrations
                 {
                     table.PrimaryKey("PK_Settings", x => x.Id);
                 });
+
+            migrationBuilder.InsertData(
+                table: "FtpConnections",
+                columns: new[] { "Id", "Address", "LastUsed", "Name", "Password", "Username" },
+                values: new object[] { 1, "ftp://demo.wftpserver.com", new DateTime(2024, 12, 25, 16, 6, 48, 764, DateTimeKind.Local).AddTicks(9433), "ftp://demo.wftpserver.com", "demo", "demo" });
+
+            migrationBuilder.InsertData(
+                table: "Settings",
+                columns: new[] { "Id", "BackgroundPathImage" },
+                values: new object[] { 1, "/Assets/Image (3).jpg" });
         }
 
         /// <inheritdoc />

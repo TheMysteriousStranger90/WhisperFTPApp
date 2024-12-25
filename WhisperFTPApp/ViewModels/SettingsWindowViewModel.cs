@@ -1,6 +1,8 @@
-﻿using System.Reactive;
-using System.Threading.Tasks;
+﻿using System.Diagnostics;
+using System.IO;
+using System.Reactive;
 using ReactiveUI;
+using WhisperFTPApp.Logger;
 using WhisperFTPApp.Services.Interfaces;
 using WhisperFTPApp.Settings;
 
@@ -8,12 +10,14 @@ namespace WhisperFTPApp.ViewModels;
 
 public class SettingsWindowViewModel : ViewModelBase
 {
+    private string LogFilePath => StaticFileLogger.GetLogFolderPath();
+    public ReactiveCommand<Unit, Unit> OpenLogFolderCommand { get; }
     private readonly ISettingsService _settingsService;
     private readonly IBackgroundService _backgroundService;
     private string _selectedBackground;
-    
+
     public BackgroundSettings BackgroundSettings { get; } = new();
-    
+
     public string SelectedBackground
     {
         get => _selectedBackground;
@@ -29,44 +33,15 @@ public class SettingsWindowViewModel : ViewModelBase
         _settingsService = settingsService;
         _backgroundService = backgroundService;
         _selectedBackground = _backgroundService.CurrentBackground;
-    }
 
-    
-    /*
-    private readonly ISettingsService _settingsService;
-    private string _selectedBackground;
-    public BackgroundSettings BackgroundSettings { get; } = new();
-    
-    public string SelectedBackground
-    {
-        get => _selectedBackground;
-        set => this.RaiseAndSetIfChanged(ref _selectedBackground, value);
-    }
-
-    public ReactiveCommand<string, Unit> SetBackgroundCommand { get; }
-
-    public SettingsWindowViewModel(ISettingsService settingsService)
-    {
-        _settingsService = settingsService;
-        _selectedBackground = BackgroundSettings.SelectedBackground;
-        
-        SetBackgroundCommand = ReactiveCommand.Create<string>(async path =>
+        OpenLogFolderCommand = ReactiveCommand.Create(() =>
         {
-            SelectedBackground = path;
-            await SaveBackgroundSettingAsync(path);
+            var path = Path.GetDirectoryName(LogFilePath);
+            if (path != null)
+            {
+                Process.Start("explorer.exe", path);
+                StaticFileLogger.LogInformation("Log folder opened by user");
+            }
         });
-        
-        _ = LoadBackgroundSettingAsync();
     }
-
-    private async Task LoadBackgroundSettingAsync()
-    {
-        SelectedBackground = await _settingsService.LoadBackgroundSettingAsync();
-    }
-
-    private async Task SaveBackgroundSettingAsync(string background)
-    {
-        await _settingsService.SaveBackgroundSettingAsync(background);
-    }
-    */
 }

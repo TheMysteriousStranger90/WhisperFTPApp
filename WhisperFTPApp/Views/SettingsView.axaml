@@ -7,8 +7,8 @@
 
     <Border Classes="panel" Padding="16">
         <StackPanel Spacing="16">
-            <TextBlock Text="Settings" FontSize="24"/>
-            
+            <TextBlock Text="Settings" FontSize="24" />
+            <TextBlock Text="Background Image" FontSize="18" />
             <ListBox ItemsSource="{Binding BackgroundSettings.AvailableBackgrounds}"
                      SelectedItem="{Binding SelectedBackground}">
                 <ListBox.ItemsPanel>
@@ -18,8 +18,8 @@
                 </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Border Width="200" 
-                                Height="120" 
+                        <Border Width="200"
+                                Height="120"
                                 Margin="8"
                                 Background="#20FFFFFF"
                                 BorderBrush="White"
@@ -28,20 +28,28 @@
                             <Panel>
                                 <Image Source="{Binding Converter={x:Static global:AssetPathConverter.Instance}}"
                                        Stretch="UniformToFill"
-                                       RenderOptions.BitmapInterpolationMode="HighQuality"/>
+                                       RenderOptions.BitmapInterpolationMode="HighQuality" />
                                 <Border Background="#40000000"
                                         IsVisible="{Binding $self.DataContext, 
                                                   Converter={StaticResource StringEqualsConverter},
                                                   ConverterParameter={Binding $parent[ListBox].SelectedItem}}"
                                         VerticalAlignment="Bottom"
                                         Padding="8,4">
-                                    <TextBlock Text="Selected" Foreground="White"/>
+                                    <TextBlock Text="Selected" Foreground="White" />
                                 </Border>
                             </Panel>
                         </Border>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
+
+            <StackPanel Spacing="8">
+                <TextBlock Text="Logging" FontSize="18" />
+                <TextBlock Text="Application logs will be saved to:"
+                           Opacity="0.7" />
+                <Button Content="Open Log Folder"
+                        Command="{Binding OpenLogFolderCommand}" />
+            </StackPanel>
         </StackPanel>
     </Border>
 </UserControl>

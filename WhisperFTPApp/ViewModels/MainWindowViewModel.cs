@@ -12,6 +12,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using ReactiveUI;
 using WhisperFTPApp.Commands;
 using WhisperFTPApp.Configurations;
+using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Models.Navigations;
 using WhisperFTPApp.Services.Interfaces;
@@ -306,33 +307,23 @@ public class MainWindowViewModel : ViewModelBase
         ShowMainViewCommand = ReactiveCommand.Create(() => { });
         LocalFileStats = new FileStats();
         RemoteFileStats = new FileStats();
-
-        
         var mainView = new MainView();
         var settingsView = new SettingsView();
-    
-        // Set DataContext for views
         mainView.DataContext = this;
-        settingsView.DataContext = new SettingsWindowViewModel(settingsService, backgroundService); 
-    
-        // Initialize current view
+        settingsView.DataContext = new SettingsWindowViewModel(settingsService, backgroundService);
         _mainView = mainView;
         _settingsView = settingsView;
         _currentView = mainView;
-
         ShowMainViewCommand = ReactiveCommand.Create(() => 
         {
             CurrentView = _mainView;
         });
-    
         ShowSettingsCommand = ReactiveCommand.Create(() =>
         {
             CurrentView = _settingsView;
         });
-        
         _backgroundService = backgroundService;
         BackgroundPath = backgroundService.CurrentBackground;
-        
         _backgroundService.BackgroundChanged
             .Subscribe(path => BackgroundPath = path);
 
@@ -381,6 +372,7 @@ public class MainWindowViewModel : ViewModelBase
     private async Task ConnectToFtpAsync()
     {
         IsTransferring = true;
+        StaticFileLogger.LogInformation($"Attempting to connect to {FtpAddress}");
         try
         {
             StatusMessage = "Connecting to FTP server...";
@@ -413,6 +405,7 @@ public class MainWindowViewModel : ViewModelBase
             {
                 IsConnected = true;
                 StatusMessage = "Connected successfully";
+                StaticFileLogger.LogInformation($"Successfully connected to {FtpAddress}");
                 var items = await _ftpService.ListDirectoryAsync(configuration);
                 FtpItems = new ObservableCollection<FileSystemItem>(items);
                 UpdateRemoteStats();
@@ -423,12 +416,14 @@ public class MainWindowViewModel : ViewModelBase
             {
                 IsConnected = false;
                 StatusMessage = "Failed to connect. Please check your credentials.";
+                StaticFileLogger.LogError($"Failed to connect to {FtpAddress}");
             }
         }
         catch (Exception ex)
         {
             IsConnected = false;
             StatusMessage = $"Connection error: {ex.Message}";
+            StaticFileLogger.LogError($"Connection error: {ex.Message}");
             FtpItems?.Clear();
             UpdateRemoteStats();
         }
@@ -441,6 +436,7 @@ public class MainWindowViewModel : ViewModelBase
     private async Task UploadFileAsync()
     {
         IsTransferring = true;
+        StaticFileLogger.LogInformation($"Starting upload operation from {LocalCurrentPath}");
         try
         {
             if (SelectedLocalItem == null)
@@ -469,10 +465,12 @@ public class MainWindowViewModel : ViewModelBase
 
             await RefreshDirectoryAsync();
             StatusMessage = "Upload complete";
+            StaticFileLogger.LogInformation($"Upload completed");
         }
         catch (Exception ex)
         {
             StatusMessage = $"Upload failed: {ex.Message}";
+            StaticFileLogger.LogError($"Upload failed: {ex.Message}");
         }
         finally
         {
@@ -524,6 +522,7 @@ public class MainWindowViewModel : ViewModelBase
     private async Task DownloadFileAsync()
     {
         IsTransferring = true;
+        StaticFileLogger.LogInformation($"Starting download of {SelectedFtpItem?.Name}");
         try
         {
             if (SelectedFtpItem == null)
@@ -548,10 +547,12 @@ public class MainWindowViewModel : ViewModelBase
 
             await RefreshLocalFiles();
             StatusMessage = "Download complete";
+            StaticFileLogger.LogInformation($"Download completed");
         }
         catch (Exception ex)
         {
             StatusMessage = $"Download failed: {ex.Message}";
+            StaticFileLogger.LogError($"Download failed: {ex.Message}");
         }
         finally
         {
@@ -591,6 +592,7 @@ public class MainWindowViewModel : ViewModelBase
     private async Task DeleteFileAsync()
     {
         IsTransferring = true;
+        StaticFileLogger.LogInformation($"Attempting to delete {SelectedFtpItem?.Name}");
         try
         {
             if (SelectedFtpItem == null) return;
@@ -600,10 +602,12 @@ public class MainWindowViewModel : ViewModelBase
             await _ftpService.DeleteFileAsync(configuration, SelectedFtpItem.FullPath);
             await RefreshDirectoryAsync();
             StatusMessage = "Delete complete";
+            StaticFileLogger.LogInformation($"Delete completed: {SelectedFtpItem.Name}");
         }
         catch (Exception ex)
         {
             StatusMessage = $"Delete failed: {ex.Message}";
+            StaticFileLogger.LogError($"Delete failed: {ex.Message}");
         }
         finally
         {
@@ -849,6 +853,7 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task DisconnectAsync()
     {
+        StaticFileLogger.LogInformation("Disconnecting from FTP server");
         try
         {
             await _ftpService.DisconnectAsync();
@@ -856,10 +861,12 @@ public class MainWindowViewModel : ViewModelBase
             UpdateRemoteStats();
             IsConnected = false;
             StatusMessage = "Disconnected from FTP server";
+            StaticFileLogger.LogInformation("Successfully disconnected from FTP server");
         }
         catch (Exception ex)
         {
             StatusMessage = $"Error disconnecting: {ex.Message}";
+            StaticFileLogger.LogError($"Disconnect failed: {ex.Message}");
         }
     }
 

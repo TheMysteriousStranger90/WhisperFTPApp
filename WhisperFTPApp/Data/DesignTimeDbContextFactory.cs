@@ -8,7 +8,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
     public AppDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        optionsBuilder.UseSqlite("Data Source=WhisperFTPApp.db");
+        optionsBuilder.UseSqlite("Data Source=DatabaseWhisperFTPApp.db");
 
         return new AppDbContext(optionsBuilder.Options);
     }

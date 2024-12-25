@@ -7,6 +7,7 @@ using WhisperFTPApp.Configurations;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Services.Interfaces;
 using System.Globalization;
+using WhisperFTPApp.Logger;
 
 namespace WhisperFTPApp.Services;
 
@@ -18,10 +19,12 @@ public class FtpService : IFtpService
 
     public async Task<bool> ConnectAsync(FtpConfiguration configuration)
     {
+        StaticFileLogger.LogInformation($"Attempting to connect to {configuration.FtpAddress}");
         for (int attempt = 1; attempt <= MaxRetries; attempt++)
         {
             try
             {
+                StaticFileLogger.LogInformation($"Connection attempt {attempt} of {MaxRetries}");
                 var connectTask = SendRequest(configuration);
                 var timeoutTask = Task.Delay(configuration.Timeout);
                 var completedTask = await Task.WhenAny(connectTask, timeoutTask);
@@ -31,14 +34,17 @@ public class FtpService : IFtpService
                     return await connectTask;
                 }
 
+                StaticFileLogger.LogError($"Connection attempt {attempt} timed out");
                 if (attempt < MaxRetries)
                 {
                     int delay = BaseDelay * (int)Math.Pow(2, attempt - 1);
+                    StaticFileLogger.LogInformation($"Waiting {delay}ms before retry");
                     await Task.Delay(delay);
                 }
             }
             catch (WebException ex)
             {
+                StaticFileLogger.LogError($"Connection attempt {attempt} failed: {ex.Message}");
                 if (attempt == MaxRetries)
                 {
                     return IsAuthenticationError(ex);
@@ -49,6 +55,7 @@ public class FtpService : IFtpService
             }
         }
 
+        StaticFileLogger.LogError("All connection attempts failed");
         return false;
     }
 
@@ -115,87 +122,130 @@ public class FtpService : IFtpService
 
     public async Task<IEnumerable<FileSystemItem>> ListDirectoryAsync(FtpConfiguration configuration, string path = "/")
     {
-        var items = new List<FileSystemItem>();
-        var request =
-            (FtpWebRequest)WebRequest.Create($"{configuration.FtpAddress.TrimEnd('/')}/{path.TrimStart('/')}");
-        request.Method = WebRequestMethods.Ftp.ListDirectoryDetails;
-        request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
-
-        using var response = (FtpWebResponse)await request.GetResponseAsync();
-        using var streamReader = new StreamReader(response.GetResponseStream());
-        string line;
-
-        while ((line = await streamReader.ReadLineAsync()) != null)
+        StaticFileLogger.LogInformation($"Listing directory: {path}");
+        try
         {
-            var item = ParseFtpListItem(line, path);
-            if (item != null)
-                items.Add(item);
-        }
+            var items = new List<FileSystemItem>();
+            var request =
+                (FtpWebRequest)WebRequest.Create($"{configuration.FtpAddress.TrimEnd('/')}/{path.TrimStart('/')}");
+            request.Method = WebRequestMethods.Ftp.ListDirectoryDetails;
+            request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
 
-        return items;
+            using var response = (FtpWebResponse)await request.GetResponseAsync();
+            using var streamReader = new StreamReader(response.GetResponseStream());
+            string line;
+
+            while ((line = await streamReader.ReadLineAsync()) != null)
+            {
+                var item = ParseFtpListItem(line, path);
+                if (item != null)
+                    items.Add(item);
+            }
+
+            StaticFileLogger.LogInformation($"Listed {items.Count} items in directory {path}");
+            return items;
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Failed to list directory {path}: {ex.Message}");
+            throw;
+        }
     }
 
     public async Task UploadFileAsync(FtpConfiguration configuration, string localPath, string remotePath,
         IProgress<double> progress)
     {
-        var request =
-            (FtpWebRequest)WebRequest.Create(
-                $"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
-        request.Method = WebRequestMethods.Ftp.UploadFile;
-        request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
-
-        using var fileStream = File.OpenRead(localPath);
-        using var ftpStream = await request.GetRequestStreamAsync();
-
-        var buffer = new byte[8192];
-        long totalBytes = fileStream.Length;
-        long bytesRead = 0;
-        int count;
-
-        while ((count = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        StaticFileLogger.LogInformation($"Starting upload: {localPath} -> {remotePath}");
+        try
         {
-            await ftpStream.WriteAsync(buffer, 0, count);
-            bytesRead += count;
-            progress?.Report((double)bytesRead / totalBytes * 100);
+            var request =
+                (FtpWebRequest)WebRequest.Create(
+                    $"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            request.Method = WebRequestMethods.Ftp.UploadFile;
+            request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+
+            using var fileStream = File.OpenRead(localPath);
+            using var ftpStream = await request.GetRequestStreamAsync();
+
+            var buffer = new byte[8192];
+            long totalBytes = fileStream.Length;
+            long bytesRead = 0;
+            int count;
+
+            while ((count = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            {
+                await ftpStream.WriteAsync(buffer, 0, count);
+                bytesRead += count;
+                progress?.Report((double)bytesRead / totalBytes * 100);
+            }
+
+            StaticFileLogger.LogInformation($"Upload completed: {remotePath}");
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Upload failed {remotePath}: {ex.Message}");
+            throw;
         }
     }
 
     public async Task DownloadFileAsync(FtpConfiguration configuration, string remotePath, string localPath,
         IProgress<double> progress)
     {
-        var request =
-            (FtpWebRequest)WebRequest.Create(
-                $"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
-        request.Method = WebRequestMethods.Ftp.DownloadFile;
-        request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
-
-        using var response = (FtpWebResponse)await request.GetResponseAsync();
-        using var ftpStream = response.GetResponseStream();
-        using var fileStream = File.Create(localPath);
-
-        var buffer = new byte[8192];
-        long totalBytes = response.ContentLength;
-        long bytesRead = 0;
-        int count;
-
-        while ((count = await ftpStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        StaticFileLogger.LogInformation($"Starting download: {remotePath} -> {localPath}");
+        try
         {
-            await fileStream.WriteAsync(buffer, 0, count);
-            bytesRead += count;
-            progress?.Report((double)bytesRead / totalBytes * 100);
+            var request =
+                (FtpWebRequest)WebRequest.Create(
+                    $"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            request.Method = WebRequestMethods.Ftp.DownloadFile;
+            request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+
+            using var response = (FtpWebResponse)await request.GetResponseAsync();
+            using var ftpStream = response.GetResponseStream();
+            using var fileStream = File.Create(localPath);
+
+            var buffer = new byte[8192];
+            long totalBytes = response.ContentLength;
+            long bytesRead = 0;
+            int count;
+
+            while ((count = await ftpStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            {
+                await fileStream.WriteAsync(buffer, 0, count);
+                bytesRead += count;
+                progress?.Report((double)bytesRead / totalBytes * 100);
+            }
+
+            StaticFileLogger.LogInformation($"Download completed: {localPath}");
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Download failed {remotePath}: {ex.Message}");
+            throw;
         }
     }
 
     public async Task DeleteFileAsync(FtpConfiguration configuration, string remotePath)
     {
-        var request =
-            (FtpWebRequest)WebRequest.Create(
-                $"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
-        request.Method = WebRequestMethods.Ftp.DeleteFile;
-        request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+        StaticFileLogger.LogInformation($"Deleting file: {remotePath}");
+        try
+        {
+            var request =
+                (FtpWebRequest)WebRequest.Create(
+                    $"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            request.Method = WebRequestMethods.Ftp.DeleteFile;
+            request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
 
-        using var response = (FtpWebResponse)await request.GetResponseAsync();
+            using var response = (FtpWebResponse)await request.GetResponseAsync();
+            StaticFileLogger.LogInformation($"File deleted: {remotePath}");
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Delete failed {remotePath}: {ex.Message}");
+            throw;
+        }
     }
+
 
     private FileSystemItem ParseFtpListItem(string line, string currentPath)
     {
