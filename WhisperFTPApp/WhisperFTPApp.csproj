@@ -34,4 +34,12 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
         <PackageReference Include="ReactiveUI" Version="20.1.63" />
     </ItemGroup>
+
+
+    <ItemGroup>
+        <AvaloniaResource Include="Assets\**" />
+        <Content Include="Assets\*.jpg">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
 </Project>

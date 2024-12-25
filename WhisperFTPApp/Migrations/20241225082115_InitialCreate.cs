@@ -27,6 +27,19 @@ namespace WhisperFTPApp.Migrations
                 {
                     table.PrimaryKey("PK_FtpConnections", x => x.Id);
                 });
+
+            migrationBuilder.CreateTable(
+                name: "Settings",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    BackgroundPathImage = table.Column<string>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Settings", x => x.Id);
+                });
         }
 
         /// <inheritdoc />
@@ -34,6 +47,9 @@ namespace WhisperFTPApp.Migrations
         {
             migrationBuilder.DropTable(
                 name: "FtpConnections");
+
+            migrationBuilder.DropTable(
+                name: "Settings");
         }
     }
 }

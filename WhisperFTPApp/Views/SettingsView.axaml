@@ -1,6 +1,7 @@
 ﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:WhisperFTPApp.ViewModels"
+             xmlns:global="clr-namespace:WhisperFTPApp.Converters"
              x:DataType="vm:SettingsWindowViewModel"
              x:Class="WhisperFTPApp.Views.SettingsView">
 
@@ -25,7 +26,9 @@
                                 BorderThickness="2"
                                 CornerRadius="4">
                             <Panel>
-                                <Image Source="{Binding}" Stretch="UniformToFill"/>
+                                <Image Source="{Binding Converter={x:Static global:AssetPathConverter.Instance}}"
+                                       Stretch="UniformToFill"
+                                       RenderOptions.BitmapInterpolationMode="HighQuality"/>
                                 <Border Background="#40000000"
                                         IsVisible="{Binding $self.DataContext, 
                                                   Converter={StaticResource StringEqualsConverter},

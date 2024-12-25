@@ -244,11 +244,7 @@ public class MainWindowViewModel : ViewModelBase
         }
     }
     
-
-    
     public ReactiveCommand<Unit, Unit> ShowSettingsCommand { get; }
-    
-    
     private Control _currentView;
     private readonly Control _mainView;
     private readonly Control _settingsView;
@@ -258,8 +254,17 @@ public class MainWindowViewModel : ViewModelBase
         get => _currentView;
         private set => this.RaiseAndSetIfChanged(ref _currentView, value);
     }
+    
+    private readonly IBackgroundService _backgroundService;
+    private string _backgroundPath;
 
-    public MainWindowViewModel(IFtpService ftpService, ISettingsService settingsService)
+    public string BackgroundPath
+    {
+        get => _backgroundPath;
+        private set => this.RaiseAndSetIfChanged(ref _backgroundPath, value);
+    }
+
+    public MainWindowViewModel(IFtpService ftpService, ISettingsService settingsService, IBackgroundService backgroundService)
     {
         _settingsService = settingsService;
         _ftpService = ftpService;
@@ -308,7 +313,7 @@ public class MainWindowViewModel : ViewModelBase
     
         // Set DataContext for views
         mainView.DataContext = this;
-        settingsView.DataContext = new SettingsWindowViewModel(settingsService);
+        settingsView.DataContext = new SettingsWindowViewModel(settingsService, backgroundService); 
     
         // Initialize current view
         _mainView = mainView;
@@ -324,6 +329,12 @@ public class MainWindowViewModel : ViewModelBase
         {
             CurrentView = _settingsView;
         });
+        
+        _backgroundService = backgroundService;
+        BackgroundPath = backgroundService.CurrentBackground;
+        
+        _backgroundService.BackgroundChanged
+            .Subscribe(path => BackgroundPath = path);
 
         LoadRecentConnections();
         InitializeLocalNavigation();

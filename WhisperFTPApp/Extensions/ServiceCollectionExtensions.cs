@@ -13,11 +13,12 @@ public static class ServiceCollectionExtensions
     public static void AddCommonServices(this IServiceCollection collection)
     {
         collection.AddDbContext<AppDbContext>(options =>
-                options.UseSqlite("Data Source=WhisperFTP.db"),
+                options.UseSqlite("Data Source=WhisperFTPApp.db"),
             ServiceLifetime.Singleton);
         
         collection.AddSingleton<ISettingsService, SettingsService>();
         collection.AddSingleton<IFtpService, FtpService>();
+        collection.AddSingleton<IBackgroundService, BackgroundService>();
     }
     
     public static void AddCommonViewModels(this IServiceCollection collection)

@@ -11,7 +11,7 @@
         Title="WhisperFTP">
 
     <Window.Background>
-        <ImageBrush Stretch="UniformToFill" Source="/Assets/Image (3).jpg" />
+        <ImageBrush Stretch="UniformToFill" Source="{Binding BackgroundPath, FallbackValue='/Assets/Image (3).jpg'}" />
     </Window.Background>
 
     <Window.Styles>
