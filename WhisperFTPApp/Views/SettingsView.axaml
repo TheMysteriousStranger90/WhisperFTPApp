@@ -3,9 +3,42 @@
              xmlns:vm="using:WhisperFTPApp.ViewModels"
              x:DataType="vm:SettingsWindowViewModel"
              x:Class="WhisperFTPApp.Views.SettingsView">
-    <!-- Existing content -->
 
     <Border Classes="panel" Padding="16">
-        <TextBlock Text="Settings View" FontSize="24"/>
+        <StackPanel Spacing="16">
+            <TextBlock Text="Settings" FontSize="24"/>
+            
+            <ListBox ItemsSource="{Binding BackgroundSettings.AvailableBackgrounds}"
+                     SelectedItem="{Binding SelectedBackground}">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Width="200" 
+                                Height="120" 
+                                Margin="8"
+                                Background="#20FFFFFF"
+                                BorderBrush="White"
+                                BorderThickness="2"
+                                CornerRadius="4">
+                            <Panel>
+                                <Image Source="{Binding}" Stretch="UniformToFill"/>
+                                <Border Background="#40000000"
+                                        IsVisible="{Binding $self.DataContext, 
+                                                  Converter={StaticResource StringEqualsConverter},
+                                                  ConverterParameter={Binding $parent[ListBox].SelectedItem}}"
+                                        VerticalAlignment="Bottom"
+                                        Padding="8,4">
+                                    <TextBlock Text="Selected" Foreground="White"/>
+                                </Border>
+                            </Panel>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </StackPanel>
     </Border>
 </UserControl>
