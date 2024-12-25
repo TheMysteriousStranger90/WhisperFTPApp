@@ -714,10 +714,37 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task NavigateToFolderAsync(FileSystemItem item)
     {
-        if (!item.IsDirectory) return;
-        CurrentDirectory = item.FullPath;
-        UpdateBreadcrumbs();
-        await RefreshDirectoryAsync();
+        try
+        {
+            if (item == null)
+            {
+                StaticFileLogger.LogError("Navigation attempted with null item");
+                return;
+            }
+
+            if (!IsConnected)
+            {
+                StaticFileLogger.LogError("Cannot navigate: Not connected to FTP server");
+                StatusMessage = "Please connect to FTP server first";
+                return;
+            }
+
+            if (!item.IsDirectory)
+            {
+                StaticFileLogger.LogInformation($"Skipping navigation for non-directory item: {item.Name}");
+                return;
+            }
+
+            StaticFileLogger.LogInformation($"Navigating to: {item.FullPath}");
+            CurrentDirectory = item.FullPath;
+            UpdateBreadcrumbs();
+            await RefreshDirectoryAsync();
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Navigation failed: {ex.Message}");
+            StatusMessage = $"Navigation failed: {ex.Message}";
+        }
     }
 
     private async Task NavigateToItemAsync(NavigationItem item)
