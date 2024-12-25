@@ -1,12 +1,41 @@
 # WhisperFTPApp
+WhisperFTPApp is FTP app designed for seamless file management and transfer operations.
 
+## Features
+- 📁 Dual-pane file management interface
+- 🔄 FTP operations support (upload, download, delete)
+- 🎨 Customizable background themes
+- 📝 Built-in logging system
+- 💾 Recent connections history
 
+## Technical Stack
+- Framework: .NET 7
+- UI: Avalonia UI
+- Architecture: MVVM pattern
+- Database: SQLite
+- Reactive Extensions: ReactiveUI
 
+## Core Functionality
 
+####  FTP Operations
+- Connect to FTP servers
+- Browse remote directories
+- Upload/Download files and folders
+- Delete remote files
+- View file properties
 
-## Future Development
+####  File Management
+- Local file system navigation
+- Drive selection
+- File size and type display
+- Modified date tracking
 
-This project is still under development.
+####  User Experience
+- Background customization
+- Session logging
+- Connection history
+- Progress indicators
+- Status messages
 
 ## Contributing
 
