@@ -1,0 +1,295 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:WhisperFTPApp.ViewModels"
+             x:DataType="viewModels:MainWindowViewModel"
+             x:Class="WhisperFTPApp.Views.MainView">
+
+    <DockPanel Grid.Column="1" Margin="8,16,16,16">
+        <!-- Navigation Panel -->
+        <Border Classes="panel" DockPanel.Dock="Top" Padding="16,8" Margin="0,0,0,16">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <ItemsControl ItemsSource="{Binding Breadcrumbs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="4" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Classes="link" Content="{Binding Display}"
+                                    Command="{Binding NavigateCommand}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- Connection Panel -->
+        <Border Classes="panel" DockPanel.Dock="Top" Padding="12" Margin="0,0,0,16">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBox Width="240" Watermark="FTP Address (ftp://example.com)" Text="{Binding FtpAddress}" />
+                <TextBox Width="130" Watermark="Username" Text="{Binding Username}" />
+                <TextBox Width="130" Watermark="Password" PasswordChar="•" Text="{Binding Password}" />
+                <TextBox Width="55" Watermark="Port" Text="{Binding Port}" />
+                <Button Command="{Binding ConnectCommand}" IsEnabled="{Binding !IsConnected}" Padding="10,6">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{StaticResource RefreshIcon}" Width="18" Height="18" />
+                        <TextBlock Text="Connect" FontSize="13" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}" Padding="10,6">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{StaticResource DisconnectIcon}" Width="18" Height="18" />
+                        <TextBlock Text="Disconnect" FontSize="13" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding CleanCommand}" Padding="10,6">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{StaticResource CleanIcon}" Width="18" Height="18" />
+                        <TextBlock Text="Clean" FontSize="13" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding ShowRecentConnectionsCommand}" Padding="10,6">
+                    <PathIcon Data="{StaticResource ListOfConnections}" Width="18" Height="18" />
+                    <Button.Flyout>
+                        <Flyout>
+                            <ListBox ItemsSource="{Binding RecentConnections}"
+                                     SelectionMode="Single"
+                                     SelectedItem="{Binding SelectedRecentConnection}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="*, Auto">
+                                            <TextBlock Text="{Binding Address}"
+                                                       VerticalAlignment="Center" />
+                                            <Button Grid.Column="1"
+                                                    Command="{Binding $parent[Window].((viewModels:MainWindowViewModel)DataContext).DeleteConnectionCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Background="Transparent"
+                                                    Margin="8,0,0,0">
+                                                <PathIcon Data="{StaticResource DeleteIcon}"
+                                                          Width="16"
+                                                          Height="16" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Status Bar -->
+        <Border Classes="panel" DockPanel.Dock="Bottom" Padding="16,8" Margin="0,16,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="16">
+                <Panel Width="24" Height="24" IsVisible="{Binding IsTransferring}">
+                    <PathIcon Data="{StaticResource RefreshIcon}">
+                        <PathIcon.Styles>
+                            <Style Selector="PathIcon">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:1"
+                                               IterationCount="Infinite">
+                                        <KeyFrame Cue="0%">
+                                            <Setter Property="RotateTransform.Angle" Value="0" />
+                                        </KeyFrame>
+                                        <KeyFrame Cue="100%">
+                                            <Setter Property="RotateTransform.Angle" Value="360" />
+                                        </KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </PathIcon.Styles>
+                    </PathIcon>
+                </Panel>
+                <TextBlock Text="{Binding StatusMessage}" FontSize="14" HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Local Files Panel -->
+            <Border Classes="panel" Grid.Column="0" Padding="16">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Spacing="8">
+                        <!-- Drive Selection -->
+                        <ComboBox ItemsSource="{Binding AvailableDrives}"
+                                  SelectedItem="{Binding SelectedDrive}"
+                                  Width="100">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+
+                        <!-- Local Navigation -->
+                        <DockPanel Margin="0,4">
+                            <Button DockPanel.Dock="Left"
+                                    Command="{Binding NavigateLocalUpCommand}"
+                                    Margin="0,0,4,0">
+                                <PathIcon Data="{StaticResource ArrowUpIcon}" />
+                            </Button>
+                            <TextBox Text="{Binding LocalCurrentPath}" />
+                        </DockPanel>
+                    </StackPanel>
+
+                    <!-- Local Files Stats -->
+                    <StackPanel DockPanel.Dock="Bottom"
+                                Orientation="Horizontal"
+                                Spacing="16"
+                                Margin="0,8,0,0">
+                        <TextBlock
+                            Text="{Binding LocalFileStats.TotalItems, 
+                       StringFormat='Files: {0}'}" />
+                        <TextBlock
+                            Text="{Binding LocalFileStats.TotalSize, 
+                       Converter={StaticResource FileSizeConverter}, 
+                       StringFormat='Size: {0}'}" />
+                    </StackPanel>
+
+                    <!-- Local Files Grid -->
+                    <DataGrid ItemsSource="{Binding LocalItems}"
+                              SelectedItem="{Binding SelectedLocalItem}"
+                              IsReadOnly="True"
+                              AutoGenerateColumns="False"
+                              Margin="0,8">
+                        <Interaction.Behaviors>
+                            <EventTriggerBehavior EventName="DoubleTapped">
+                                <InvokeCommandAction Command="{Binding NavigateToLocalDirectoryCommand}"
+                                                     CommandParameter="{Binding SelectedLocalItem}" />
+                            </EventTriggerBehavior>
+                        </Interaction.Behaviors>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Name" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <PathIcon Data="{StaticResource FolderIcon}"
+                                                          IsVisible="{Binding IsDirectory}" />
+                                                <TextBlock Text="{Binding Name}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="Size"
+                                                Binding="{Binding Size, 
+                                   Converter={StaticResource FileSizeConverter}}" />
+                            <DataGridTextColumn Header="Modified"
+                                                Binding="{Binding Modified, 
+                                   StringFormat={}{0:g}}" />
+                            <DataGridTextColumn Header="Type"
+                                                Binding="{Binding Type}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+
+            <Border Classes="panel" Grid.Column="2" Padding="16">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Spacing="8">
+                        <!-- Actions Panel -->
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2,0,0">
+                            <TextBlock Text="Remote" VerticalAlignment="Center" FontWeight="SemiBold" />
+                            <Button Command="{Binding UploadCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <PathIcon Data="{StaticResource UploadIcon}"  Width="18" Height="18"/>
+                                    <TextBlock Text="Upload" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding DownloadCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <PathIcon Data="{StaticResource DownloadIcon}"  Width="18" Height="18"/>
+                                    <TextBlock Text="Download" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding DeleteCommand}" Classes="danger">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <PathIcon Data="{StaticResource DeleteIcon}"  Width="18" Height="18"/>
+                                    <TextBlock Text="Delete" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding RefreshCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <PathIcon Data="{StaticResource RefreshIcon}"  Width="18" Height="18"/>
+                                    <TextBlock Text="Refresh" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Remote Navigation -->
+                        <DockPanel Margin="0,2">
+                            <Button DockPanel.Dock="Left"
+                                    Command="{Binding NavigateUpCommand}"
+                                    Margin="0,0,4,0">
+                                <PathIcon Data="{StaticResource ArrowUpIcon}" />
+                            </Button>
+                            <TextBox Text="{Binding CurrentDirectory}" />
+                        </DockPanel>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Bottom"
+                                Orientation="Horizontal"
+                                Spacing="16"
+                                Margin="0,8,0,0">
+                        <TextBlock Text="{Binding RemoteFileStats.TotalItems, StringFormat='Files: {0}'}" />
+                        <TextBlock
+                            Text="{Binding RemoteFileStats.TotalSize, 
+                       Converter={StaticResource FileSizeConverter}, 
+                       StringFormat='Size: {0}'}" />
+                    </StackPanel>
+
+                    <DataGrid ItemsSource="{Binding FtpItems}"
+                              AutoGenerateColumns="False"
+                              SelectedItem="{Binding SelectedFtpItem}"
+                              IsReadOnly="True"
+                              Margin="0,8">
+                        <Interaction.Behaviors>
+                            <EventTriggerBehavior EventName="DoubleTapped">
+                                <InvokeCommandAction Command="{Binding NavigateToFolderCommand}"
+                                                     CommandParameter="{Binding SelectedFtpItem}" />
+                            </EventTriggerBehavior>
+                        </Interaction.Behaviors>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Name" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <PathIcon Data="{StaticResource FolderIcon}"
+                                                          IsVisible="{Binding IsDirectory}" />
+                                                <TextBlock Text="{Binding Name}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="Size"
+                                                Binding="{Binding Size, 
+                                           Converter={StaticResource FileSizeConverter}}" />
+                            <DataGridTextColumn Header="Modified"
+                                                Binding="{Binding Modified, 
+                                           StringFormat={}{0:g}}" />
+                            <DataGridTextColumn Header="Type"
+                                                Binding="{Binding IsDirectory,
+                                           Converter={StaticResource TypeConverter}}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>

@@ -15,10 +15,11 @@ using WhisperFTPApp.Configurations;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Models.Navigations;
 using WhisperFTPApp.Services.Interfaces;
+using WhisperFTPApp.Views;
 
 namespace WhisperFTPApp.ViewModels;
 
-public class MainWindowViewModel : ReactiveObject
+public class MainWindowViewModel : ViewModelBase
 {
     private readonly ISettingsService _settingsService;
     private string _selectedPath;
@@ -228,6 +229,7 @@ public class MainWindowViewModel : ReactiveObject
     public ObservableCollection<FtpConnectionEntity> RecentConnections => _recentConnections;
     public ReactiveCommand<Unit, Unit> ShowRecentConnectionsCommand { get; }
     public ReactiveCommand<FtpConnectionEntity, Unit> DeleteConnectionCommand { get; }
+    public ReactiveCommand<Unit, Unit> ShowMainViewCommand { get; }
 
     public FtpConnectionEntity SelectedRecentConnection
     {
@@ -240,6 +242,21 @@ public class MainWindowViewModel : ReactiveObject
                 _ = SwitchConnectionAsync(value);
             }
         }
+    }
+    
+
+    
+    public ReactiveCommand<Unit, Unit> ShowSettingsCommand { get; }
+    
+    
+    private Control _currentView;
+    private readonly Control _mainView;
+    private readonly Control _settingsView;
+
+    public Control CurrentView
+    {
+        get => _currentView;
+        private set => this.RaiseAndSetIfChanged(ref _currentView, value);
     }
 
     public MainWindowViewModel(IFtpService ftpService, ISettingsService settingsService)
@@ -281,9 +298,32 @@ public class MainWindowViewModel : ReactiveObject
         });
         ShowRecentConnectionsCommand = ReactiveCommand.Create(() => { });
         DeleteConnectionCommand = ReactiveCommand.CreateFromTask<FtpConnectionEntity>(DeleteConnectionAsync);
+        ShowMainViewCommand = ReactiveCommand.Create(() => { });
         LocalFileStats = new FileStats();
         RemoteFileStats = new FileStats();
 
+        
+        var mainView = new MainView();
+        var settingsView = new SettingsView();
+    
+        // Set DataContext for views
+        mainView.DataContext = this;
+        settingsView.DataContext = new SettingsWindowViewModel(settingsService);
+    
+        // Initialize current view
+        _mainView = mainView;
+        _settingsView = settingsView;
+        _currentView = mainView;
+
+        ShowMainViewCommand = ReactiveCommand.Create(() => 
+        {
+            CurrentView = _mainView;
+        });
+    
+        ShowSettingsCommand = ReactiveCommand.Create(() =>
+        {
+            CurrentView = _settingsView;
+        });
 
         LoadRecentConnections();
         InitializeLocalNavigation();

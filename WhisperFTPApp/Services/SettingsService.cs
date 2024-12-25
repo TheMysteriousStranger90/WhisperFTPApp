@@ -84,4 +84,25 @@ public class SettingsService : ISettingsService
             await _context.SaveChangesAsync();
         }
     }
+    
+    public async Task SaveBackgroundSettingAsync(string backgroundPath)
+    {
+        var settings = await _context.Settings.FirstOrDefaultAsync();
+        if (settings == null)
+        {
+            settings = new SettingsEntity { BackgroundPathImage = backgroundPath };
+            _context.Settings.Add(settings);
+        }
+        else
+        {
+            settings.BackgroundPathImage = backgroundPath;
+        }
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<string> LoadBackgroundSettingAsync()
+    {
+        var settings = await _context.Settings.FirstOrDefaultAsync();
+        return settings?.BackgroundPathImage ?? "/Assets/Image (3).jpg";
+    }
 }
