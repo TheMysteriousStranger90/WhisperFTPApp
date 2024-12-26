@@ -1,4 +1,5 @@
 # WhisperFTPApp
+![Image 1](Screenshots/Screen1.png)
 WhisperFTPApp is FTP app designed for seamless file management and transfer operations.
 
 ## Features
@@ -8,6 +9,12 @@ WhisperFTPApp is FTP app designed for seamless file management and transfer oper
 - 📝 Built-in logging system
 - 💾 Recent connections history
 - 🌍 Multi-language support (English, Russian)
+- 📡 WiFi Network Scanner & FTP Port Analysis* (last feature are not implemented correct yet)
+
+
+![Image 2](Screenshots/Screen2.png)
+![Image 3](Screenshots/Screen3.png)
+![Image 4](Screenshots/Screen4.png)
 
 ## Technical Stack
 - Framework: .NET 7

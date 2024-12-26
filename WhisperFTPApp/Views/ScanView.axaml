@@ -40,8 +40,32 @@
             </Border>
 
             <!-- Status Bar -->
-            <Border Classes="panel" DockPanel.Dock="Bottom" Padding="8" Margin="0,16,0,0">
-                <TextBlock Text="{Binding StatusMessage}"/>
+            <Border Classes="panel" DockPanel.Dock="Bottom" Padding="16,8" Margin="0,16,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <Panel Width="24" Height="24" IsVisible="{Binding IsScanning}">
+                        <PathIcon Data="{StaticResource RefreshIcon}">
+                            <PathIcon.Styles>
+                                <Style Selector="PathIcon">
+                                    <Style.Animations>
+                                        <Animation Duration="0:0:1"
+                                                   IterationCount="Infinite">
+                                            <KeyFrame Cue="0%">
+                                                <Setter Property="RotateTransform.Angle" Value="0" />
+                                            </KeyFrame>
+                                            <KeyFrame Cue="100%">
+                                                <Setter Property="RotateTransform.Angle" Value="360" />
+                                            </KeyFrame>
+                                        </Animation>
+                                    </Style.Animations>
+                                </Style>
+                            </PathIcon.Styles>
+                        </PathIcon>
+                    </Panel>
+                    <TextBlock Text="{Binding StatusMessage}" 
+                               FontSize="14" 
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </StackPanel>
             </Border>
 
             <!-- Networks Grids -->
@@ -66,10 +90,10 @@
                                                   Width="150"/>
                                 <DataGridTextColumn Header="Signal" 
                                                   Binding="{Binding SignalStrength}"
-                                                  Width="80"/>
+                                                  Width="120"/>
                                 <DataGridTextColumn Header="Channel" 
                                                   Binding="{Binding Channel}"
-                                                  Width="80"/>
+                                                  Width="120"/>
                                 <DataGridTextColumn Header="Security" 
                                                   Binding="{Binding SecurityType}"
                                                   Width="120"/>
@@ -85,7 +109,7 @@
                 <Border Classes="panel" Grid.Row="1" Margin="0,8,0,0">
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top" 
-                                 Text="Connected Networks with FTP Status" 
+                                 Text="Connected Open Networks with FTP Status" 
                                  FontWeight="SemiBold"
                                  Margin="8"/>
                         
@@ -100,7 +124,7 @@
                                                   Binding="{Binding IpAddress}"
                                                   Width="150"/>
                                 <DataGridTemplateColumn Header="FTP Status" 
-                                                      Width="100">
+                                                      Width="120">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal" Spacing="4">

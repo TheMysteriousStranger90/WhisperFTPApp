@@ -101,7 +101,14 @@ public class ScanWindowViewModel : ViewModelBase, IDisposable
         _cts?.Cancel();
         _wifiScanner.StopScan();
         IsScanning = false;
-        StatusMessage = "Scan stopped";
+    
+        var openNetworks = Networks.Count(n => n.SecurityType == "IEEE80211_Open");
+        var ftpNetworks = ConnectedNetworks.Count(n => n.HasOpenFtp);
+    
+        StatusMessage = $"Scan stopped.\n" +
+                        $"Total networks found: {Networks.Count}\n" +
+                        $"Open networks: {openNetworks}\n" +
+                        $"Networks with open FTP: {ftpNetworks}";
     }
 
     public void Dispose()

@@ -29,6 +29,9 @@ public class WifiScannerService : IWifiScannerService, IDisposable
     {
         var networks = new List<WifiNetwork>();
         _isScanning = true;
+        var scanStartTime = DateTime.Now;
+
+        StaticFileLogger.LogInformation($"Starting WiFi scan at {scanStartTime}");
 
         try
         {
@@ -40,10 +43,14 @@ public class WifiScannerService : IWifiScannerService, IDisposable
 
                     try
                     {
+                        StaticFileLogger.LogInformation($"Scanning interface: {wlanIface.InterfaceName}");
                         wlanIface.Scan();
                         await Task.Delay(1000, token);
 
                         var wlanBssEntries = wlanIface.GetNetworkBssList();
+                        StaticFileLogger.LogInformation(
+                            $"Found {wlanBssEntries.Length} networks on interface {wlanIface.InterfaceName}");
+
                         foreach (var network in wlanBssEntries)
                         {
                             if (token.IsCancellationRequested) break;
@@ -61,8 +68,17 @@ public class WifiScannerService : IWifiScannerService, IDisposable
                             networks.Add(wifiNetwork);
                             NetworkFound?.Invoke(this, wifiNetwork);
 
+                            StaticFileLogger.LogInformation(
+                                $"Network found: SSID={wifiNetwork.SSID}, " +
+                                $"BSSID={wifiNetwork.BSSID}, " +
+                                $"Signal={wifiNetwork.SignalStrength}dBm, " +
+                                $"Channel={wifiNetwork.Channel}, " +
+                                $"Security={wifiNetwork.SecurityType}");
+
                             if (wifiNetwork.SecurityType == "IEEE80211_Open")
                             {
+                                StaticFileLogger.LogInformation(
+                                    $"Attempting to connect to open network: {wifiNetwork.SSID}");
                                 var connected = await ConnectToNetworkAsync(wifiNetwork.SSID);
                                 if (connected)
                                 {
@@ -71,6 +87,11 @@ public class WifiScannerService : IWifiScannerService, IDisposable
                                     wifiNetwork.IpAddress = NetworkUtils.GetLocalIPv4(adapter);
                                     wifiNetwork.HasOpenFtp = await CheckFtpAccessAsync(wifiNetwork.IpAddress);
                                     NetworkConnected?.Invoke(this, wifiNetwork);
+
+                                    StaticFileLogger.LogInformation(
+                                        $"Connected to network: {wifiNetwork.SSID}, " +
+                                        $"IP={wifiNetwork.IpAddress}, " +
+                                        $"FTP={(wifiNetwork.HasOpenFtp ? "Open" : "Closed")}");
                                 }
                             }
                         }
@@ -104,6 +125,15 @@ public class WifiScannerService : IWifiScannerService, IDisposable
         finally
         {
             _isScanning = false;
+            var scanDuration = DateTime.Now - scanStartTime;
+            var openNetworks = networks.Count(n => n.SecurityType == "IEEE80211_Open");
+            var ftpNetworks = networks.Count(n => n.HasOpenFtp);
+
+            StaticFileLogger.LogInformation(
+                $"Scan completed in {scanDuration.TotalSeconds:F1} seconds\n" +
+                $"Total networks found: {networks.Count}\n" +
+                $"Open networks: {openNetworks}\n" +
+                $"Networks with open FTP: {ftpNetworks}");
         }
 
         return networks;
