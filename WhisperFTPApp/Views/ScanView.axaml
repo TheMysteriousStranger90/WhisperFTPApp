@@ -7,10 +7,11 @@
 
     <Border Classes="panel" Padding="16">
         <DockPanel>
-            <!-- Control Panel -->
             <Border Classes="panel" DockPanel.Dock="Top" Padding="16" Margin="0,0,0,16">
                 <StackPanel Spacing="8">
-                    <TextBlock Text="WiFi Network Scanner" FontSize="24" FontWeight="SemiBold"/>
+                    <TextBlock Text="{DynamicResource WifiScanner}" 
+                             FontSize="24" 
+                             FontWeight="SemiBold"/>
                     
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Command="{Binding StartScanCommand}"
@@ -18,7 +19,7 @@
                                 IsEnabled="{Binding !IsScanning}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <PathIcon Data="{StaticResource RefreshIcon}"/>
-                                <TextBlock Text="Start Scan"/>
+                                <TextBlock Text="{DynamicResource StartScan}"/>
                             </StackPanel>
                         </Button>
                         
@@ -27,7 +28,7 @@
                                 IsEnabled="{Binding IsScanning}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <PathIcon Data="{StaticResource StopIcon}"/>
-                                <TextBlock Text="Stop"/>
+                                <TextBlock Text="{DynamicResource StopScan}"/>
                             </StackPanel>
                         </Button>
                     </StackPanel>
@@ -48,7 +49,7 @@
                                 <Style Selector="PathIcon">
                                     <Style.Animations>
                                         <Animation Duration="0:0:1"
-                                                   IterationCount="Infinite">
+                                                 IterationCount="Infinite">
                                             <KeyFrame Cue="0%">
                                                 <Setter Property="RotateTransform.Angle" Value="0" />
                                             </KeyFrame>
@@ -62,19 +63,19 @@
                         </PathIcon>
                     </Panel>
                     <TextBlock Text="{Binding StatusMessage}" 
-                               FontSize="14" 
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
+                             FontSize="14" 
+                             TextWrapping="Wrap"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center" />
                 </StackPanel>
             </Border>
 
             <!-- Networks Grids -->
             <Grid RowDefinitions="*,*" Margin="0,8">
-                <!-- Available Networks -->
                 <Border Classes="panel" Grid.Row="0" Margin="0,0,0,8">
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top" 
-                                 Text="Available Networks" 
+                                 Text="{DynamicResource AvailableNetworks}" 
                                  FontWeight="SemiBold"
                                  Margin="8"/>
                         
@@ -88,28 +89,27 @@
                                 <DataGridTextColumn Header="BSSID" 
                                                   Binding="{Binding BSSID}"
                                                   Width="150"/>
-                                <DataGridTextColumn Header="Signal" 
+                                <DataGridTextColumn Header="{DynamicResource Signal}"
                                                   Binding="{Binding SignalStrength}"
                                                   Width="120"/>
-                                <DataGridTextColumn Header="Channel" 
+                                <DataGridTextColumn Header="{DynamicResource Channel}"
                                                   Binding="{Binding Channel}"
                                                   Width="120"/>
-                                <DataGridTextColumn Header="Security" 
+                                <DataGridTextColumn Header="{DynamicResource Security}"
                                                   Binding="{Binding SecurityType}"
                                                   Width="120"/>
-                                <DataGridTextColumn Header="Last Seen" 
+                                <DataGridTextColumn Header="{DynamicResource LastSeen}"
                                                   Binding="{Binding LastSeen, StringFormat={}{0:g}}"
-                                                  Width="150"/>
+                                                  Width="200"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </DockPanel>
                 </Border>
 
-                <!-- Connected Networks with FTP -->
                 <Border Classes="panel" Grid.Row="1" Margin="0,8,0,0">
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top" 
-                                 Text="Connected Open Networks with FTP Status" 
+                                 Text="{DynamicResource ConnectedNetworks}"
                                  FontWeight="SemiBold"
                                  Margin="8"/>
                         
@@ -123,7 +123,7 @@
                                 <DataGridTextColumn Header="IP Address" 
                                                   Binding="{Binding IpAddress}"
                                                   Width="150"/>
-                                <DataGridTemplateColumn Header="FTP Status" 
+                                <DataGridTemplateColumn Header="{DynamicResource FtpStatus}"
                                                       Width="120">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -137,10 +137,10 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Security" 
+                                <DataGridTextColumn Header="{DynamicResource Security}"
                                                   Binding="{Binding SecurityType}"
                                                   Width="120"/>
-                                <DataGridTextColumn Header="Last Connected" 
+                                <DataGridTextColumn Header="{DynamicResource LastConnected}"
                                                   Binding="{Binding LastSeen, StringFormat={}{0:g}}"
                                                   Width="150"/>
                             </DataGrid.Columns>
