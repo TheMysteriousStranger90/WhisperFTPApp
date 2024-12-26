@@ -302,4 +302,26 @@ public class FtpService : IFtpService
             return null;
         }
     }
+    
+    public async Task DeleteDirectoryAsync(FtpConfiguration configuration, string path)
+    {
+        var items = await ListDirectoryAsync(configuration, path);
+        foreach (var item in items)
+        {
+            if (item.IsDirectory)
+            {
+                await DeleteDirectoryAsync(configuration, item.FullPath);
+            }
+            else
+            {
+                await DeleteFileAsync(configuration, item.FullPath);
+            }
+        }
+
+        var request = (FtpWebRequest)WebRequest.Create($"{configuration.FtpAddress.TrimEnd('/')}/{path.TrimStart('/')}");
+        request.Method = WebRequestMethods.Ftp.RemoveDirectory;
+        request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+        
+        using var response = (FtpWebResponse)await request.GetResponseAsync();
+    }
 }

@@ -14,4 +14,5 @@ public interface IFtpService
     Task UploadFileAsync(FtpConfiguration configuration, string localPath, string remotePath, IProgress<double> progress);
     Task DownloadFileAsync(FtpConfiguration configuration, string remotePath, string localPath, IProgress<double> progress);
     Task DeleteFileAsync(FtpConfiguration configuration, string remotePath);
+    Task DeleteDirectoryAsync(FtpConfiguration configuration, string path);
 }

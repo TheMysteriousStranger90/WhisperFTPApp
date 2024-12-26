@@ -597,23 +597,41 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task DeleteFileAsync()
     {
+        if (SelectedFtpItem == null)
+        {
+            StatusMessage = "No item selected for deletion";
+            return;
+        }
+    
         IsTransferring = true;
-        StaticFileLogger.LogInformation($"Attempting to delete {SelectedFtpItem?.Name}");
+        var itemToDelete = SelectedFtpItem;
+        var itemName = itemToDelete.Name;
+    
+        StaticFileLogger.LogInformation($"Attempting to delete {itemName}");
         try
         {
-            if (SelectedFtpItem == null) return;
-
-            StatusMessage = $"Deleting {SelectedFtpItem.Name}...";
+            StatusMessage = $"Deleting {itemName}...";
             var configuration = CreateConfiguration();
-            await _ftpService.DeleteFileAsync(configuration, SelectedFtpItem.FullPath);
+
+            if (itemToDelete.IsDirectory)
+            {
+                await _ftpService.DeleteDirectoryAsync(configuration, itemToDelete.FullPath);
+            }
+            else
+            {
+                await _ftpService.DeleteFileAsync(configuration, itemToDelete.FullPath);
+            }
+        
+            SelectedFtpItem = null;
             await RefreshDirectoryAsync();
-            StatusMessage = "Delete complete";
-            StaticFileLogger.LogInformation($"Delete completed: {SelectedFtpItem.Name}");
+        
+            StatusMessage = $"Successfully deleted {itemName}";
+            StaticFileLogger.LogInformation($"Delete completed: {itemName}");
         }
         catch (Exception ex)
         {
             StatusMessage = $"Delete failed: {ex.Message}";
-            StaticFileLogger.LogError($"Delete failed: {ex.Message}");
+            StaticFileLogger.LogError($"Delete failed for {itemName}: {ex.Message}");
         }
         finally
         {
