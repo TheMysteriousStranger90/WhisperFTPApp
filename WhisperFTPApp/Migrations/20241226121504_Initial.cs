@@ -44,7 +44,7 @@ namespace WhisperFTPApp.Migrations
             migrationBuilder.InsertData(
                 table: "FtpConnections",
                 columns: new[] { "Id", "Address", "LastUsed", "Name", "Password", "Username" },
-                values: new object[] { 1, "ftp://demo.wftpserver.com", new DateTime(2024, 12, 25, 16, 6, 48, 764, DateTimeKind.Local).AddTicks(9433), "ftp://demo.wftpserver.com", "demo", "demo" });
+                values: new object[] { 1, "ftp://demo.wftpserver.com", new DateTime(2024, 12, 26, 14, 15, 4, 680, DateTimeKind.Local).AddTicks(908), "ftp://demo.wftpserver.com", "demo", "demo" });
 
             migrationBuilder.InsertData(
                 table: "Settings",

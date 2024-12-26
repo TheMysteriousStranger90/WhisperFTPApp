@@ -51,7 +51,7 @@ namespace WhisperFTPApp.Migrations
                         {
                             Id = 1,
                             Address = "ftp://demo.wftpserver.com",
-                            LastUsed = new DateTime(2024, 12, 25, 16, 6, 48, 764, DateTimeKind.Local).AddTicks(9433),
+                            LastUsed = new DateTime(2024, 12, 26, 14, 15, 4, 680, DateTimeKind.Local).AddTicks(908),
                             Name = "ftp://demo.wftpserver.com",
                             Password = "demo",
                             Username = "demo"
