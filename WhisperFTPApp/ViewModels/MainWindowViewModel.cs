@@ -15,6 +15,7 @@ using WhisperFTPApp.Configurations;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Models.Navigations;
+using WhisperFTPApp.Services;
 using WhisperFTPApp.Services.Interfaces;
 using WhisperFTPApp.Views;
 
@@ -22,6 +23,7 @@ namespace WhisperFTPApp.ViewModels;
 
 public class MainWindowViewModel : ViewModelBase
 {
+    private readonly LocalizationService _localizationService;
     private readonly ISettingsService _settingsService;
     private string _selectedPath;
     private string _ftpAddress;
@@ -267,6 +269,7 @@ public class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel(IFtpService ftpService, ISettingsService settingsService, IBackgroundService backgroundService)
     {
+        _localizationService = LocalizationService.Instance;
         _settingsService = settingsService;
         _ftpService = ftpService;
         _breadcrumbs = new ObservableCollection<BreadcrumbItem>();
@@ -310,7 +313,10 @@ public class MainWindowViewModel : ViewModelBase
         var mainView = new MainView();
         var settingsView = new SettingsView();
         mainView.DataContext = this;
-        settingsView.DataContext = new SettingsWindowViewModel(settingsService, backgroundService);
+        settingsView.DataContext = new SettingsWindowViewModel(
+            settingsService, 
+            backgroundService,
+            _localizationService);
         _mainView = mainView;
         _settingsView = settingsView;
         _currentView = mainView;

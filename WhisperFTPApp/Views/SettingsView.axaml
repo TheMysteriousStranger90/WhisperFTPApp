@@ -7,8 +7,8 @@
 
     <Border Classes="panel" Padding="16">
         <StackPanel Spacing="16">
-            <TextBlock Text="Settings" FontSize="24" />
-            <TextBlock Text="Background Image" FontSize="18" />
+            <TextBlock Text="{DynamicResource Settings}" FontSize="24" />
+            <TextBlock Text="{DynamicResource BackgroundImage}" FontSize="18" />
             <ListBox ItemsSource="{Binding BackgroundSettings.AvailableBackgrounds}"
                      SelectedItem="{Binding SelectedBackground}">
                 <ListBox.ItemsPanel>
@@ -31,23 +31,35 @@
                                        RenderOptions.BitmapInterpolationMode="HighQuality" />
                                 <Border Background="#40000000"
                                         IsVisible="{Binding $self.DataContext, 
-                                                  Converter={StaticResource StringEqualsConverter},
-                                                  ConverterParameter={Binding $parent[ListBox].SelectedItem}}"
+                                              Converter={StaticResource StringEqualsConverter},
+                                              ConverterParameter={Binding $parent[ListBox].SelectedItem}}"
                                         VerticalAlignment="Bottom"
                                         Padding="8,4">
-                                    <TextBlock Text="Selected" Foreground="White" />
+                                    <TextBlock Text="{DynamicResource Selected}" Foreground="White" />
                                 </Border>
                             </Panel>
                         </Border>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
+            
+            <StackPanel Spacing="8">
+                <TextBlock Text="{DynamicResource Language}" FontSize="18" />
+                <ComboBox ItemsSource="{Binding AvailableLanguages}"
+                          SelectedItem="{Binding SelectedLanguage}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DisplayName}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
 
             <StackPanel Spacing="8">
-                <TextBlock Text="Logging" FontSize="18" />
-                <TextBlock Text="Application logs will be saved to:"
+                <TextBlock Text="{DynamicResource Logging}" FontSize="18" />
+                <TextBlock Text="{DynamicResource LoggingDescription}"
                            Opacity="0.7" />
-                <Button Content="Open Log Folder"
+                <Button Content="{DynamicResource OpenLogFolder}"
                         Command="{Binding OpenLogFolderCommand}" />
             </StackPanel>
         </StackPanel>

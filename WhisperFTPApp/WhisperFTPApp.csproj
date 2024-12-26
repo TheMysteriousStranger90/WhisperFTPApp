@@ -33,6 +33,8 @@
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.20" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
         <PackageReference Include="ReactiveUI" Version="20.1.63" />
+        <PackageReference Include="System.Resources.Extensions" Version="7.0.0" />
+        <PackageReference Include="System.Resources.ResourceManager" Version="4.3.0" />
     </ItemGroup>
 
 
@@ -41,5 +43,31 @@
         <Content Include="Assets\*.jpg">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+    </ItemGroup>
+
+
+    <ItemGroup>
+      <EmbeddedResource Update="Assets\Resources.resx">
+        <Generator>ResXFileCodeGenerator</Generator>
+        <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      </EmbeddedResource>
+      <EmbeddedResource Update="Assets\Resources.ru-RU.resx">
+        <Generator>ResXFileCodeGenerator</Generator>
+        <LastGenOutput>Resources.ru-RU.Designer.cs</LastGenOutput>
+      </EmbeddedResource>
+    </ItemGroup>
+
+
+    <ItemGroup>
+      <Compile Update="Assets\Resources.Designer.cs">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>Resources.resx</DependentUpon>
+      </Compile>
+      <Compile Update="Assets\Resources.ru-RU.Designer.cs">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>Resources.ru-RU.resx</DependentUpon>
+      </Compile>
     </ItemGroup>
 </Project>

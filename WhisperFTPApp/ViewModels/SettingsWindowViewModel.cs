@@ -1,8 +1,13 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reactive;
+using System.Threading;
 using ReactiveUI;
 using WhisperFTPApp.Logger;
+using WhisperFTPApp.Services;
 using WhisperFTPApp.Services.Interfaces;
 using WhisperFTPApp.Settings;
 
@@ -10,6 +15,22 @@ namespace WhisperFTPApp.ViewModels;
 
 public class SettingsWindowViewModel : ViewModelBase
 {
+    private readonly LocalizationService _localizationService;
+    public ObservableCollection<CultureInfo> AvailableLanguages { get; }
+    private CultureInfo _selectedLanguage;
+
+    public CultureInfo SelectedLanguage
+    {
+        get => _selectedLanguage;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedLanguage, value);
+            if (value != null)
+            {
+                _localizationService.SetLanguage(value.Name);
+            }
+        }
+    }
     private string LogFilePath => StaticFileLogger.GetLogFolderPath();
     public ReactiveCommand<Unit, Unit> OpenLogFolderCommand { get; }
     private readonly ISettingsService _settingsService;
@@ -28,7 +49,7 @@ public class SettingsWindowViewModel : ViewModelBase
         }
     }
 
-    public SettingsWindowViewModel(ISettingsService settingsService, IBackgroundService backgroundService)
+    public SettingsWindowViewModel(ISettingsService settingsService, IBackgroundService backgroundService, LocalizationService localizationService)
     {
         _settingsService = settingsService;
         _backgroundService = backgroundService;
@@ -43,5 +64,14 @@ public class SettingsWindowViewModel : ViewModelBase
                 StaticFileLogger.LogInformation("Log folder opened by user");
             }
         });
+        
+        _localizationService = localizationService;
+        AvailableLanguages = new ObservableCollection<CultureInfo>
+        {
+            new("en"),
+            new("ru-RU")
+        };
+        _selectedLanguage = AvailableLanguages.First(l => 
+            l.Name == Thread.CurrentThread.CurrentUICulture.Name);
     }
 }
