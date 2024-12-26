@@ -19,12 +19,14 @@ public static class ServiceCollectionExtensions
         collection.AddSingleton<ISettingsService, SettingsService>();
         collection.AddSingleton<IFtpService, FtpService>();
         collection.AddSingleton<IBackgroundService, BackgroundService>();
+        collection.AddSingleton<IWifiScannerService, WifiScannerService>();
     }
     
     public static void AddCommonViewModels(this IServiceCollection collection)
     {
         collection.AddTransient<MainWindowViewModel>();
         collection.AddTransient<SettingsWindowViewModel>();
+        collection.AddTransient<ScanWindowViewModel>();
     }
     
     public static void AddCommonWindows(this IServiceCollection collection)
@@ -32,5 +34,6 @@ public static class ServiceCollectionExtensions
         collection.AddTransient<MainWindow>();
         collection.AddTransient<MainView>();
         collection.AddTransient<SettingsView>();
+        collection.AddTransient<ScanView>();
     }
 }
