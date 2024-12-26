@@ -25,6 +25,7 @@ public class MainWindowViewModel : ViewModelBase
 {
     private readonly LocalizationService _localizationService;
     private readonly ISettingsService _settingsService;
+    private readonly IWifiScannerService _scannerService;
     private string _selectedPath;
     private string _ftpAddress;
     private string _username;
@@ -47,6 +48,7 @@ public class MainWindowViewModel : ViewModelBase
     private FileStats _localFileStats;
     private FileStats _remoteFileStats;
     private string _port = "21";
+    private readonly Control _scanView;
 
     public string Port
     {
@@ -233,6 +235,7 @@ public class MainWindowViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> ShowRecentConnectionsCommand { get; }
     public ReactiveCommand<FtpConnectionEntity, Unit> DeleteConnectionCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowMainViewCommand { get; }
+    public ReactiveCommand<Unit, Unit> ShowScanViewCommand { get; }
 
     public FtpConnectionEntity SelectedRecentConnection
     {
@@ -267,10 +270,15 @@ public class MainWindowViewModel : ViewModelBase
         private set => this.RaiseAndSetIfChanged(ref _backgroundPath, value);
     }
 
-    public MainWindowViewModel(IFtpService ftpService, ISettingsService settingsService, IBackgroundService backgroundService)
+    public MainWindowViewModel(
+        IFtpService ftpService, 
+        ISettingsService settingsService, 
+        IBackgroundService backgroundService,
+        IWifiScannerService scannerService)
     {
         _localizationService = LocalizationService.Instance;
         _settingsService = settingsService;
+        _scannerService = scannerService;
         _ftpService = ftpService;
         _breadcrumbs = new ObservableCollection<BreadcrumbItem>();
         _recentConnections = new ObservableCollection<FtpConnectionEntity>();
@@ -332,6 +340,14 @@ public class MainWindowViewModel : ViewModelBase
         BackgroundPath = backgroundService.CurrentBackground;
         _backgroundService.BackgroundChanged
             .Subscribe(path => BackgroundPath = path);
+        
+        _scanView = new ScanView();
+        _scanView.DataContext = new ScanWindowViewModel(scannerService);
+        
+        ShowScanViewCommand = ReactiveCommand.Create(() => 
+        {
+            CurrentView = _scanView;
+        });
 
         LoadRecentConnections();
         InitializeLocalNavigation();

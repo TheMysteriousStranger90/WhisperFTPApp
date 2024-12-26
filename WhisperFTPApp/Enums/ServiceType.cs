@@ -3,5 +3,5 @@
 public enum ServiceType
 {
     Unknown,
-    Http,
+    FTP
 }

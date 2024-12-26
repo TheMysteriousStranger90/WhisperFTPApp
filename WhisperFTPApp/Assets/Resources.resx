@@ -76,4 +76,53 @@
     <data name="OpenLogFolder" xml:space="preserve">
         <value>Open Log Folder</value>
     </data>
+
+
+    <data name="WifiScanner" xml:space="preserve">
+        <value>WiFi Network Scanner</value>
+    </data>
+    <data name="StartScan" xml:space="preserve">
+        <value>Start Scan</value>
+    </data>
+    <data name="StopScan" xml:space="preserve">
+        <value>Stop</value>
+    </data>
+    <data name="AvailableNetworks" xml:space="preserve">
+        <value>Available Networks</value>
+    </data>
+    <data name="ConnectedNetworks" xml:space="preserve">
+        <value>Connected Open Networks with FTP Status</value>
+    </data>
+    <data name="Signal" xml:space="preserve">
+        <value>Signal</value>
+    </data>
+    <data name="Channel" xml:space="preserve">
+        <value>Channel</value>
+    </data>
+    <data name="Security" xml:space="preserve">
+        <value>Security</value>
+    </data>
+    <data name="LastSeen" xml:space="preserve">
+        <value>Last Seen</value>
+    </data>
+    <data name="FtpStatus" xml:space="preserve">
+        <value>FTP Status</value>
+    </data>
+    <data name="LastConnected" xml:space="preserve">
+        <value>Last Connected</value>
+    </data>
+    <data name="ScanStarting" xml:space="preserve">
+        <value>Starting WiFi scan...</value>
+    </data>
+    <data name="ScanStopped" xml:space="preserve">
+        <value>Scan stopped</value>
+    </data>
+    <data name="ScanComplete" xml:space="preserve">
+        <value>Scan complete. Found {0} networks</value>
+    </data>
+    <data name="ScanSummary" xml:space="preserve">
+        <value>Total networks found: {0}
+Open networks: {1}
+Networks with open FTP: {2}</value>
+    </data>
 </root>

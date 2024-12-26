@@ -76,4 +76,52 @@
     <data name="OpenLogFolder" xml:space="preserve">
         <value>Открыть папку логов</value>
     </data>
+
+    <data name="WifiScanner" xml:space="preserve">
+        <value>Сканер WiFi сетей</value>
+    </data>
+    <data name="StartScan" xml:space="preserve">
+        <value>Начать сканирование</value>
+    </data>
+    <data name="StopScan" xml:space="preserve">
+        <value>Остановить</value>
+    </data>
+    <data name="AvailableNetworks" xml:space="preserve">
+        <value>Доступные сети</value>
+    </data>
+    <data name="ConnectedNetworks" xml:space="preserve">
+        <value>Подключенные открытые сети с FTP статусом</value>
+    </data>
+    <data name="Signal" xml:space="preserve">
+        <value>Сигнал</value>
+    </data>
+    <data name="Channel" xml:space="preserve">
+        <value>Канал</value>
+    </data>
+    <data name="Security" xml:space="preserve">
+        <value>Безопасность</value>
+    </data>
+    <data name="LastSeen" xml:space="preserve">
+        <value>Последний раз замечен</value>
+    </data>
+    <data name="FtpStatus" xml:space="preserve">
+        <value>FTP Статус</value>
+    </data>
+    <data name="LastConnected" xml:space="preserve">
+        <value>Последнее подключение</value>
+    </data>
+    <data name="ScanStarting" xml:space="preserve">
+        <value>Начинаем сканирование WiFi...</value>
+    </data>
+    <data name="ScanStopped" xml:space="preserve">
+        <value>Сканирование остановлено</value>
+    </data>
+    <data name="ScanComplete" xml:space="preserve">
+        <value>Сканирование завершено. Найдено сетей: {0}</value>
+    </data>
+    <data name="ScanSummary" xml:space="preserve">
+        <value>Всего найдено сетей: {0}
+Открытых сетей: {1}
+Сетей с открытым FTP: {2}</value>
+    </data>
 </root>
