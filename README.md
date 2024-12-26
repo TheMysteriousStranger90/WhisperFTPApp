@@ -56,3 +56,6 @@ Bohdan Harabadzhyu
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
+
+## SourceForge
+[![Download WhisperFTPApp](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/whisperftpapp/files/latest/download)
