@@ -57,5 +57,12 @@ Bohdan Harabadzhyu
 
 [MIT](https://choosealicense.com/licenses/mit/)
 
+## YouTube Review
+<details>
+<summary>📺 Watch Video Review</summary>
+
+[![YouTube](http://i.ytimg.com/vi/uSTPpDcKVKc/hqdefault.jpg)](https://www.youtube.com/watch?v=uSTPpDcKVKc)
+</details>
+
 ## SourceForge
 [![Download WhisperFTPApp](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/whisperftpapp/files/latest/download)
