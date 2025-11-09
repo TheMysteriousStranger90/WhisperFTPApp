@@ -1,5 +1,4 @@
-﻿using System;
-using System.Globalization;
+﻿using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -7,7 +6,7 @@ using Avalonia.Platform;
 
 namespace WhisperFTPApp.Converters;
 
-internal sealed class WindowBackgroundConverter : IValueConverter
+public sealed class WindowBackgroundConverter : IValueConverter
 {
     public static readonly WindowBackgroundConverter Instance = new();
 
@@ -20,27 +19,17 @@ internal sealed class WindowBackgroundConverter : IValueConverter
                 if (path.StartsWith("avares://", StringComparison.Ordinal))
                 {
                     var uri = new Uri(path);
-                    using (var stream = AssetLoader.Open(uri))
+                    var stream = AssetLoader.Open(uri);
+                    return new ImageBrush(new Bitmap(stream))
                     {
-                        using (var bitmap = new Bitmap(stream))
-                        {
-                            return new ImageBrush(bitmap)
-                            {
-                                Stretch = Stretch.UniformToFill
-                            };
-                        }
-                    }
+                        Stretch = Stretch.UniformToFill
+                    };
                 }
-                else
+
+                return new ImageBrush(new Bitmap(path))
                 {
-                    using (var bitmap = new Bitmap(path))
-                    {
-                        return new ImageBrush(bitmap)
-                        {
-                            Stretch = Stretch.UniformToFill
-                        };
-                    }
-                }
+                    Stretch = Stretch.UniformToFill
+                };
             }
             catch (Exception ex)
             {
