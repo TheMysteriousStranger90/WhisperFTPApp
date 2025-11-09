@@ -1,39 +1,41 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Diagnostics;
 using System.Globalization;
 using System.Resources;
-using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Platform;
 using WhisperFTPApp.Assets;
 
 namespace WhisperFTPApp.Services;
 
+public class CultureChangedEventArgs : EventArgs
+{
+    public CultureInfo Culture { get; }
+    public CultureChangedEventArgs(CultureInfo culture) => Culture = culture;
+}
+
 public class LocalizationService
 {
-    private static LocalizationService _instance;
+    private static LocalizationService? _instance;
     public static LocalizationService Instance => _instance ??= new LocalizationService();
 
-    private readonly ResourceManager _resourceManager;
+    private readonly ResourceManager _resourceManager = Resources.ResourceManager;
     private const string DefaultLanguage = "en";
-    private const string RussianLanguage = "ru-RU";
 
-    public event EventHandler<CultureInfo> CultureChanged;
+    public event EventHandler<CultureChangedEventArgs>? CultureChanged;
     public CultureInfo CurrentCulture { get; private set; }
 
     private LocalizationService()
     {
         try
         {
-            _resourceManager = Resources.ResourceManager;
             CurrentCulture = new CultureInfo(DefaultLanguage);
             SetLanguage(DefaultLanguage);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"LocalizationService initialization error: {ex}");
+            CurrentCulture = CultureInfo.InvariantCulture;
         }
     }
 
@@ -66,19 +68,22 @@ public class LocalizationService
 
             var newDict = new ResourceDictionary();
             var resourceSet = _resourceManager.GetResourceSet(CurrentCulture, true, true);
-            
+
             if (resourceSet != null)
             {
                 foreach (DictionaryEntry entry in resourceSet)
                 {
-                    newDict[entry.Key.ToString()] = entry.Value.ToString();
-                    Debug.WriteLine($"Added resource: {entry.Key} = {entry.Value}");
+                    if (entry.Key != null && entry.Value != null)
+                    {
+                        newDict[entry.Key.ToString() ?? throw new InvalidOperationException()] = entry.Value.ToString();
+                        Debug.WriteLine($"Added resource: {entry.Key} = {entry.Value}");
+                    }
                 }
             }
 
             app.Resources.MergedDictionaries.Clear();
             app.Resources.MergedDictionaries.Add(newDict);
-            CultureChanged?.Invoke(this, CurrentCulture);
+            CultureChanged?.Invoke(this, new CultureChangedEventArgs(CurrentCulture));
         }
         catch (Exception ex)
         {

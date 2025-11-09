@@ -1,16 +1,15 @@
-﻿using System;
-using System.Globalization;
+﻿using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 
 namespace WhisperFTPApp.Converters;
 
-public class AssetPathConverter : IValueConverter
+internal sealed class AssetPathConverter : IValueConverter
 {
     public static readonly AssetPathConverter Instance = new();
 
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is string path)
         {
@@ -29,7 +28,7 @@ public class AssetPathConverter : IValueConverter
         return null;
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         throw new NotImplementedException();
     }

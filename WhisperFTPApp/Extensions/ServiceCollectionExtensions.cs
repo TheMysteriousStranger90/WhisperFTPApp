@@ -8,27 +8,38 @@ using WhisperFTPApp.Views;
 
 namespace WhisperFTPApp.Extensions;
 
-public static class ServiceCollectionExtensions
+internal static class ServiceCollectionExtensions
 {
     public static void AddCommonServices(this IServiceCollection collection)
     {
-        collection.AddDbContext<AppDbContext>(options =>
-                options.UseSqlite("Data Source=DatabaseWhisperFTPApp.db"),
-            ServiceLifetime.Singleton);
-        
+        collection.AddDbContextFactory<AppDbContext>(options =>
+        {
+            options.UseSqlite("Data Source=DatabaseWhisperFTPApp.db",
+                sqliteOptions =>
+                {
+                    sqliteOptions.CommandTimeout(30);
+                    sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                });
+#if DEBUG
+            options.EnableSensitiveDataLogging();
+            options.EnableDetailedErrors();
+#endif
+        });
+
+
         collection.AddSingleton<ISettingsService, SettingsService>();
         collection.AddSingleton<IFtpService, FtpService>();
         collection.AddSingleton<IBackgroundService, BackgroundService>();
         collection.AddSingleton<IWifiScannerService, WifiScannerService>();
     }
-    
+
     public static void AddCommonViewModels(this IServiceCollection collection)
     {
         collection.AddTransient<MainWindowViewModel>();
         collection.AddTransient<SettingsWindowViewModel>();
         collection.AddTransient<ScanWindowViewModel>();
     }
-    
+
     public static void AddCommonWindows(this IServiceCollection collection)
     {
         collection.AddTransient<MainWindow>();

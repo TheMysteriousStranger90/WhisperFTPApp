@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.ObjectModel;
-using System.Linq;
+﻿using System.Collections.ObjectModel;
 using System.Reactive;
-using System.Threading;
-using System.Threading.Tasks;
 using Avalonia.Threading;
 using ReactiveUI;
 using WhisperFTPApp.Logger;
@@ -12,36 +8,33 @@ using WhisperFTPApp.Services.Interfaces;
 
 namespace WhisperFTPApp.ViewModels;
 
-public class ScanWindowViewModel : ViewModelBase, IDisposable
+public class ScanWindowViewModel : ReactiveObject, IDisposable
 {
     private readonly IWifiScannerService _wifiScanner;
-    private ObservableCollection<WifiNetwork> _networks;
-    private ObservableCollection<WifiNetwork> _connectedNetworks;
+    private readonly ObservableCollection<WifiNetwork> _networks = new ObservableCollection<WifiNetwork>();
+    private readonly ObservableCollection<WifiNetwork> _connectedNetworks = new ObservableCollection<WifiNetwork>();
     private bool _isScanning;
-    private CancellationTokenSource _cts;
-    private string _statusMessage;
+    private CancellationTokenSource _cts = new CancellationTokenSource();
+    private string _statusMessage = string.Empty;
     private double _scanProgress;
     private bool _disposed;
 
     public ScanWindowViewModel(IWifiScannerService wifiScanner)
     {
         _wifiScanner = wifiScanner;
-        _cts = new CancellationTokenSource();
-        Networks = new ObservableCollection<WifiNetwork>();
-        ConnectedNetworks = new ObservableCollection<WifiNetwork>();
-        
+
         StartScanCommand = ReactiveCommand.CreateFromTask(
             StartScanAsync,
             this.WhenAnyValue(x => x.IsScanning, scanning => !scanning));
-            
+
         StopScanCommand = ReactiveCommand.Create(
             StopScan,
             this.WhenAnyValue(x => x.IsScanning));
-        
-        _wifiScanner.NetworkFound += OnNetworkFound;
-        _wifiScanner.NetworkConnected += OnNetworkConnected;
+
+        _wifiScanner.NetworkFound += (sender, e) => OnNetworkFound(e);
+        _wifiScanner.NetworkConnected += (sender, e) => OnNetworkConnected(e);
     }
-    
+
     public ReactiveCommand<Unit, Unit> StartScanCommand { get; }
     public ReactiveCommand<Unit, Unit> StopScanCommand { get; }
 
@@ -63,6 +56,9 @@ public class ScanWindowViewModel : ViewModelBase, IDisposable
         set => this.RaiseAndSetIfChanged(ref _scanProgress, value);
     }
 
+    public ObservableCollection<WifiNetwork> Networks => _networks;
+    public ObservableCollection<WifiNetwork> ConnectedNetworks => _connectedNetworks;
+
     private async Task StartScanAsync()
     {
         try
@@ -71,10 +67,10 @@ public class ScanWindowViewModel : ViewModelBase, IDisposable
             StatusMessage = "Starting WiFi scan...";
             Networks.Clear();
             ConnectedNetworks.Clear();
-        
+
             _cts = new CancellationTokenSource();
-            await _wifiScanner.ScanNetworksAsync(_cts.Token);
-        
+            await _wifiScanner.ScanNetworksAsync(_cts.Token).ConfigureAwait(false);
+
             if (!_cts.Token.IsCancellationRequested)
             {
                 StatusMessage = $"Scan complete. Found {Networks.Count} networks";
@@ -101,65 +97,61 @@ public class ScanWindowViewModel : ViewModelBase, IDisposable
         _cts?.Cancel();
         _wifiScanner.StopScan();
         IsScanning = false;
-    
+
         var openNetworks = Networks.Count(n => n.SecurityType == "IEEE80211_Open");
         var ftpNetworks = ConnectedNetworks.Count(n => n.HasOpenFtp);
-    
+
         StatusMessage = $"Scan stopped.\n" +
                         $"Total networks found: {Networks.Count}\n" +
                         $"Open networks: {openNetworks}\n" +
                         $"Networks with open FTP: {ftpNetworks}";
     }
 
-    public void Dispose()
-    {
-        if (!_disposed)
-        {
-            _disposed = true;
-            StopScan();
-            _cts?.Dispose();
-        }
-        GC.SuppressFinalize(this);
-    }
-    
-    public ObservableCollection<WifiNetwork> Networks
-    {
-        get => _networks;
-        set => this.RaiseAndSetIfChanged(ref _networks, value);
-    }
-
-    public ObservableCollection<WifiNetwork> ConnectedNetworks
-    {
-        get => _connectedNetworks;
-        set => this.RaiseAndSetIfChanged(ref _connectedNetworks, value);
-    }
-
-    private void OnNetworkFound(object sender, WifiNetwork network)
+    private void OnNetworkFound(NetworkFoundEventArgs e)
     {
         Dispatcher.UIThread.InvokeAsync(() =>
         {
-            var existing = Networks.FirstOrDefault(n => n.BSSID == network.BSSID);
+            var existing = Networks.FirstOrDefault(n => n.BSSID == e.Network.BSSID);
             if (existing != null)
             {
                 var index = Networks.IndexOf(existing);
-                Networks[index] = network;
+                Networks[index] = e.Network;
             }
             else
             {
-                Networks.Add(network);
+                Networks.Add(e.Network);
             }
         });
     }
 
-    private void OnNetworkConnected(object sender, WifiNetwork network)
+    private void OnNetworkConnected(NetworkConnectedEventArgs e)
     {
         Dispatcher.UIThread.InvokeAsync(() =>
         {
-            var existing = ConnectedNetworks.FirstOrDefault(n => n.BSSID == network.BSSID);
+            var existing = ConnectedNetworks.FirstOrDefault(n => n.BSSID == e.Network.BSSID);
             if (existing == null)
             {
-                ConnectedNetworks.Add(network);
+                ConnectedNetworks.Add(e.Network);
             }
         });
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+
+        if (disposing)
+        {
+            StopScan();
+            _cts?.Dispose();
+        }
+
+        _disposed = true;
     }
 }

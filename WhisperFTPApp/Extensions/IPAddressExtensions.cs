@@ -1,6 +1,4 @@
-﻿using System;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
 
 namespace WhisperFTPApp.Extensions;
 
@@ -8,6 +6,9 @@ public static class IPAddressExtensions
 {
     public static IPAddress GetNetworkAddress(this IPAddress address, IPAddress subnetMask)
     {
+        ArgumentNullException.ThrowIfNull(address);
+        ArgumentNullException.ThrowIfNull(subnetMask);
+
         byte[] ipBytes = address.GetAddressBytes();
         byte[] maskBytes = subnetMask.GetAddressBytes();
         byte[] networkBytes = new byte[ipBytes.Length];
@@ -19,9 +20,11 @@ public static class IPAddressExtensions
 
         return new IPAddress(networkBytes);
     }
-    
+
     public static int GetSubnetMaskLength(this IPAddress subnetMask)
     {
+        ArgumentNullException.ThrowIfNull(subnetMask);
+
         var bits = subnetMask.GetAddressBytes()
             .Select(b => Convert.ToString(b, 2).Count(c => c == '1'))
             .Sum();

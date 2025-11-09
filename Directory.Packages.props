@@ -1,0 +1,39 @@
+<Project>
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+        <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Avalonia UI Framework -->
+        <PackageVersion Include="Avalonia" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.Desktop" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.Controls.DataGrid" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.ReactiveUI" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.Themes.Fluent" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.Fonts.Inter" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.Diagnostics" Version="11.3.8" />
+        <PackageVersion Include="Avalonia.Xaml.Interactions" Version="11.3.0.6" />
+
+        <!-- Entity Framework Core -->
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.0" />
+
+        <!-- Dependency Injection -->
+        <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+
+        <!-- Reactive Extensions - MUST match Avalonia.ReactiveUI 11.3.8 requirements -->
+        <PackageVersion Include="ReactiveUI" Version="20.1.63" />
+        <PackageVersion Include="Splat" Version="15.2.22" />
+
+        <!-- System Libraries -->
+        <PackageVersion Include="System.Resources.Extensions" Version="9.0.0" />
+        <PackageVersion Include="System.Resources.ResourceManager" Version="4.3.0" />
+
+        <!-- Networking -->
+        <PackageVersion Include="managedwifi" Version="1.1.0" />
+
+        <!-- Code Analysis -->
+        <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.3.0.106239" />
+    </ItemGroup>
+</Project>

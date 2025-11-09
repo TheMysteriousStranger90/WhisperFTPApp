@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using WhisperFTPApp.Data;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
@@ -10,7 +6,7 @@ using WhisperFTPApp.Services.Interfaces;
 
 namespace WhisperFTPApp.Services;
 
-public class SettingsService : ISettingsService
+internal sealed class SettingsService : ISettingsService
 {
     private readonly AppDbContext _context;
 
@@ -19,21 +15,27 @@ public class SettingsService : ISettingsService
         _context = context;
     }
 
-    public async Task SaveConnectionsAsync(List<FtpConnectionEntity> connections)
+    public async Task SaveConnectionsAsync(IEnumerable<FtpConnectionEntity> connections,
+        CancellationToken cancellationToken = default)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        ArgumentNullException.ThrowIfNull(connections);
+
+        var connectionsList = connections.ToList();
+
+        var transaction = await _context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await using (transaction)
         try
         {
-            StaticFileLogger.LogInformation($"[{DateTime.Now:HH:mm:ss}] Saving {connections.Count} connections to database");
-            
-            var existing = await _context.FtpConnections.ToListAsync();
-            if (existing.Any())
+            StaticFileLogger.LogInformation($"Saving {connectionsList.Count} connections to database");
+
+            var existing = await _context.FtpConnections.ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (existing.Count != 0)
             {
                 _context.FtpConnections.RemoveRange(existing);
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             }
-            
-            foreach (var connection in connections)
+
+            foreach (var connection in connectionsList)
             {
                 var newConnection = new FtpConnectionEntity
                 {
@@ -43,24 +45,24 @@ public class SettingsService : ISettingsService
                     Password = connection.Password,
                     LastUsed = connection.LastUsed
                 };
-                
+
                 _context.FtpConnections.Add(newConnection);
-                await _context.SaveChangesAsync();
             }
 
-            await transaction.CommitAsync();
-            StaticFileLogger.LogInformation($"[{DateTime.Now:HH:mm:ss}] Connections saved successfully");
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+            StaticFileLogger.LogInformation("Connections saved successfully");
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
-            StaticFileLogger.LogError($"[{DateTime.Now:HH:mm:ss}] Database error: {ex.Message}");
-            StaticFileLogger.LogError($"[{DateTime.Now:HH:mm:ss}] Stack trace: {ex.StackTrace}");
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            StaticFileLogger.LogError($"Database error: {ex.Message}");
             throw;
         }
     }
 
-    public async Task<List<FtpConnectionEntity>> LoadConnectionsAsync()
+    public async Task<List<FtpConnectionEntity>> LoadConnectionsAsync(CancellationToken cancellationToken = default)
     {
         return await _context.FtpConnections
             .Select(e => new FtpConnectionEntity
@@ -71,39 +73,83 @@ public class SettingsService : ISettingsService
                 Password = e.Password,
                 LastUsed = e.LastUsed
             })
-            .ToListAsync();
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
-    
-    public async Task DeleteConnectionAsync(FtpConnectionEntity connection)
+
+    public async Task DeleteConnectionAsync(FtpConnectionEntity connection,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(connection);
+
         var entity = await _context.FtpConnections
-            .FirstOrDefaultAsync(x => x.Address == connection.Address);
-    
+            .FirstOrDefaultAsync(x => x.Address == connection.Address, cancellationToken)
+            .ConfigureAwait(false);
+
         if (entity != null)
         {
             _context.FtpConnections.Remove(entity);
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
     }
-    
-    public async Task SaveBackgroundSettingAsync(string backgroundPath)
+
+    public async Task SaveBackgroundSettingAsync(string backgroundPath, CancellationToken cancellationToken = default)
     {
-        var settings = await _context.Settings.FirstOrDefaultAsync();
+        ArgumentNullException.ThrowIfNull(backgroundPath);
+
+        var dbPath = ConvertToDbPath(backgroundPath);
+
+        var settings = await _context.Settings.FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
         if (settings == null)
         {
-            settings = new SettingsEntity { BackgroundPathImage = backgroundPath };
+            settings = new SettingsEntity { BackgroundPathImage = dbPath };
             _context.Settings.Add(settings);
         }
         else
         {
-            settings.BackgroundPathImage = backgroundPath;
+            settings.BackgroundPathImage = dbPath;
         }
-        await _context.SaveChangesAsync();
+
+        await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        StaticFileLogger.LogInformation($"Background path saved: {dbPath}");
     }
 
-    public async Task<string> LoadBackgroundSettingAsync()
+    public async Task<string> LoadBackgroundSettingAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await _context.Settings.FirstOrDefaultAsync();
-        return settings?.BackgroundPathImage ?? "/Assets/Image (3).jpg";
+        var settings = await _context.Settings.FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        var dbPath = settings?.BackgroundPathImage ?? "/Assets/Image (3).jpg";
+
+        var avaresPath = ConvertToAvaresPath(dbPath);
+        StaticFileLogger.LogInformation($"Background path loaded: {avaresPath}");
+
+        return avaresPath;
+    }
+
+    private static string ConvertToDbPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return "/Assets/Image (3).jpg";
+
+        if (path.StartsWith("avares://WhisperFTPApp", StringComparison.OrdinalIgnoreCase))
+        {
+            return path.Replace("avares://WhisperFTPApp", "", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return path.StartsWith('/') ? path : $"/{path}";
+    }
+
+    private static string ConvertToAvaresPath(string dbPath)
+    {
+        if (string.IsNullOrWhiteSpace(dbPath))
+            return "avares://WhisperFTPApp/Assets/Image (3).jpg";
+
+        if (dbPath.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))
+        {
+            return dbPath;
+        }
+
+        var relativePath = dbPath.TrimStart('/');
+
+        return $"avares://WhisperFTPApp/{relativePath}";
     }
 }

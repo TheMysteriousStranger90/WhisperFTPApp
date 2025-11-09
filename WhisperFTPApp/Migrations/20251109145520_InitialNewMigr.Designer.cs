@@ -11,14 +11,14 @@ using WhisperFTPApp.Data;
 namespace WhisperFTPApp.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20241226121504_Initial")]
-    partial class Initial
+    [Migration("20251109145520_InitialNewMigr")]
+    partial class InitialNewMigr
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "7.0.20");
+            modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
 
             modelBuilder.Entity("WhisperFTPApp.Models.FtpConnectionEntity", b =>
                 {
@@ -54,7 +54,7 @@ namespace WhisperFTPApp.Migrations
                         {
                             Id = 1,
                             Address = "ftp://demo.wftpserver.com",
-                            LastUsed = new DateTime(2024, 12, 26, 14, 15, 4, 680, DateTimeKind.Local).AddTicks(908),
+                            LastUsed = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Name = "ftp://demo.wftpserver.com",
                             Password = "demo",
                             Username = "demo"

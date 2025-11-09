@@ -1,57 +1,62 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.Globalization;
 using System.Net;
-using System.Threading.Tasks;
 using WhisperFTPApp.Configurations;
+using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Services.Interfaces;
-using System.Globalization;
-using WhisperFTPApp.Logger;
 
 namespace WhisperFTPApp.Services;
 
-public class FtpService : IFtpService
+internal sealed class FtpService : IFtpService
 {
-    private FtpWebRequest _currentRequest;
+    private FtpWebRequest? _currentRequest;
     private const int MaxRetries = 3;
     private const int BaseDelay = 1000;
 
-    public async Task<bool> ConnectAsync(FtpConfiguration configuration)
+    public async Task<bool> ConnectAsync(FtpConfiguration configuration, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+
         StaticFileLogger.LogInformation($"Attempting to connect to {configuration.FtpAddress}");
+
         for (int attempt = 1; attempt <= MaxRetries; attempt++)
         {
             try
             {
                 StaticFileLogger.LogInformation($"Connection attempt {attempt} of {MaxRetries}");
-                var connectTask = SendRequest(configuration);
-                var timeoutTask = Task.Delay(configuration.Timeout);
-                var completedTask = await Task.WhenAny(connectTask, timeoutTask);
 
-                if (completedTask == connectTask)
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(configuration.Timeout);
+
+                var connected = await SendRequestAsync(configuration, cts.Token).ConfigureAwait(false);
+                if (connected)
                 {
-                    return await connectTask;
+                    return true;
                 }
 
-                StaticFileLogger.LogError($"Connection attempt {attempt} timed out");
+                StaticFileLogger.LogError($"Connection attempt {attempt} failed");
                 if (attempt < MaxRetries)
                 {
                     int delay = BaseDelay * (int)Math.Pow(2, attempt - 1);
                     StaticFileLogger.LogInformation($"Waiting {delay}ms before retry");
-                    await Task.Delay(delay);
+                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                StaticFileLogger.LogInformation("Connection cancelled by user");
+                throw;
             }
             catch (WebException ex)
             {
                 StaticFileLogger.LogError($"Connection attempt {attempt} failed: {ex.Message}");
-                if (attempt == MaxRetries)
+                if (attempt >= MaxRetries)
                 {
                     return IsAuthenticationError(ex);
                 }
 
                 int delay = BaseDelay * (int)Math.Pow(2, attempt - 1);
-                await Task.Delay(delay);
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -59,213 +64,267 @@ public class FtpService : IFtpService
         return false;
     }
 
-    private async Task<bool> SendRequest(FtpConfiguration configuration)
+#pragma warning disable SYSLIB0014 // WebRequest is obsolete but required for FTP
+    private static async Task<bool> SendRequestAsync(FtpConfiguration configuration,
+        CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+
         var uriBuilder = new UriBuilder(configuration.FtpAddress)
         {
             Port = configuration.Port
         };
 
-        _currentRequest = (FtpWebRequest)WebRequest.Create(uriBuilder.Uri);
-        _currentRequest.Method = WebRequestMethods.Ftp.ListDirectory;
-        _currentRequest.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
-        _currentRequest.Timeout = configuration.Timeout;
-        _currentRequest.KeepAlive = false;
+        var request = (FtpWebRequest)WebRequest.Create(uriBuilder.Uri);
+        request.Method = WebRequestMethods.Ftp.ListDirectory;
+        request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+        request.Timeout = configuration.Timeout;
+        request.KeepAlive = false;
 
-        using (FtpWebResponse response = (FtpWebResponse)await _currentRequest.GetResponseAsync())
-        {
-            return response.StatusCode == FtpStatusCode.OpeningData ||
-                   response.StatusCode == FtpStatusCode.AccountNeeded;
-        }
+        using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
+        return response.StatusCode == FtpStatusCode.OpeningData ||
+               response.StatusCode == FtpStatusCode.AccountNeeded;
     }
 
-    public async Task DisconnectAsync()
+    public Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
-        if (_currentRequest != null)
-        {
-            _currentRequest.Abort();
-            _currentRequest = null;
-        }
+        _currentRequest?.Abort();
+        _currentRequest = null;
+        return Task.CompletedTask;
     }
 
-    private static async Task<bool> DetermineConnectionStatusAsync(Task<bool> sendRequestTask, Task timeoutTask)
+    private static bool IsAuthenticationError(WebException exception)
     {
-        var completedTask = await Task.WhenAny(sendRequestTask, timeoutTask);
-        return completedTask == sendRequestTask && await AttemptConnectionAsync(sendRequestTask);
-    }
+        ArgumentNullException.ThrowIfNull(exception);
 
-    private static async Task<bool> AttemptConnectionAsync(Task<bool> sendRequestTask)
-    {
-        try
+        if (exception.Status == WebExceptionStatus.ProtocolError &&
+            exception.Response is FtpWebResponse response &&
+            response.StatusCode == FtpStatusCode.NotLoggedIn)
         {
-            return await sendRequestTask;
-        }
-        catch (WebException)
-        {
-            return false;
-        }
-    }
-
-    private bool IsAuthenticationError(WebException exception)
-    {
-        if (exception.Status == WebExceptionStatus.ProtocolError)
-        {
-            FtpWebResponse response = exception.Response as FtpWebResponse;
-            if (response?.StatusCode == FtpStatusCode.NotLoggedIn)
-            {
-                return true;
-            }
+            return true;
         }
 
         return false;
     }
 
-    public async Task<IEnumerable<FileSystemItem>> ListDirectoryAsync(FtpConfiguration configuration, string path = "/")
+    public async Task<IEnumerable<FileSystemItem>> ListDirectoryAsync(
+        FtpConfiguration configuration,
+        string path = "/",
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(path);
+
         StaticFileLogger.LogInformation($"Listing directory: {path}");
+
         try
         {
             var items = new List<FileSystemItem>();
-            var request =
-                (FtpWebRequest)WebRequest.Create($"{configuration.FtpAddress.TrimEnd('/')}/{path.TrimStart('/')}");
+            var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{path.TrimStart('/')}");
+            var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.ListDirectoryDetails;
             request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
 
-            using var response = (FtpWebResponse)await request.GetResponseAsync();
-            using var streamReader = new StreamReader(response.GetResponseStream());
-            string line;
+            using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
+            using var stream = response.GetResponseStream();
+            using var streamReader = new StreamReader(stream);
 
-            while ((line = await streamReader.ReadLineAsync()) != null)
+            string? line;
+            while ((line = await streamReader.ReadLineAsync(cancellationToken).ConfigureAwait(false)) != null)
             {
                 var item = ParseFtpListItem(line, path);
                 if (item != null)
+                {
                     items.Add(item);
+                }
             }
 
             StaticFileLogger.LogInformation($"Listed {items.Count} items in directory {path}");
             return items;
         }
-        catch (Exception ex)
+        catch (WebException ex)
         {
             StaticFileLogger.LogError($"Failed to list directory {path}: {ex.Message}");
             throw;
         }
     }
 
-    public async Task UploadFileAsync(FtpConfiguration configuration, string localPath, string remotePath,
-        IProgress<double> progress)
+    public async Task UploadFileAsync(
+        FtpConfiguration configuration,
+        string localPath,
+        string remotePath,
+        IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(localPath);
+        ArgumentNullException.ThrowIfNull(remotePath);
+
         StaticFileLogger.LogInformation($"Starting upload: {localPath} -> {remotePath}");
+
         try
         {
-            var request =
-                (FtpWebRequest)WebRequest.Create(
-                    $"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.UploadFile;
             request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
 
-            using var fileStream = File.OpenRead(localPath);
-            using var ftpStream = await request.GetRequestStreamAsync();
-
-            var buffer = new byte[8192];
-            long totalBytes = fileStream.Length;
-            long bytesRead = 0;
-            int count;
-
-            while ((count = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            var fileStream = File.OpenRead(localPath);
+            await using (fileStream.ConfigureAwait(false))
             {
-                await ftpStream.WriteAsync(buffer, 0, count);
-                bytesRead += count;
-                progress?.Report((double)bytesRead / totalBytes * 100);
+                var ftpStream = await request.GetRequestStreamAsync().ConfigureAwait(false);
+                await using (ftpStream.ConfigureAwait(false))
+                {
+                    var buffer = new byte[8192];
+                    long totalBytes = fileStream.Length;
+                    long bytesRead = 0;
+                    int count;
+
+                    while ((count = await fileStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+                    {
+                        await ftpStream.WriteAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
+                        bytesRead += count;
+                        progress?.Report((double)bytesRead / totalBytes * 100);
+                    }
+                }
             }
 
             StaticFileLogger.LogInformation($"Upload completed: {remotePath}");
         }
-        catch (Exception ex)
+        catch (WebException ex)
         {
             StaticFileLogger.LogError($"Upload failed {remotePath}: {ex.Message}");
             throw;
         }
     }
 
-    public async Task DownloadFileAsync(FtpConfiguration configuration, string remotePath, string localPath,
-        IProgress<double> progress)
+    public async Task DownloadFileAsync(
+        FtpConfiguration configuration,
+        string remotePath,
+        string localPath,
+        IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(remotePath);
+        ArgumentNullException.ThrowIfNull(localPath);
+
         StaticFileLogger.LogInformation($"Starting download: {remotePath} -> {localPath}");
+
         try
         {
-            var request =
-                (FtpWebRequest)WebRequest.Create(
-                    $"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.DownloadFile;
             request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
 
-            using var response = (FtpWebResponse)await request.GetResponseAsync();
+            using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
             using var ftpStream = response.GetResponseStream();
-            using var fileStream = File.Create(localPath);
-
-            var buffer = new byte[8192];
-            long totalBytes = response.ContentLength;
-            long bytesRead = 0;
-            int count;
-
-            while ((count = await ftpStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            var fileStream = File.Create(localPath);
+            await using (fileStream.ConfigureAwait(false))
             {
-                await fileStream.WriteAsync(buffer, 0, count);
-                bytesRead += count;
-                progress?.Report((double)bytesRead / totalBytes * 100);
+                var buffer = new byte[8192];
+                long totalBytes = response.ContentLength;
+                long bytesRead = 0;
+                int count;
+
+                while ((count = await ftpStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
+                    bytesRead += count;
+                    progress?.Report((double)bytesRead / totalBytes * 100);
+                }
             }
 
             StaticFileLogger.LogInformation($"Download completed: {localPath}");
         }
-        catch (Exception ex)
+        catch (WebException ex)
         {
             StaticFileLogger.LogError($"Download failed {remotePath}: {ex.Message}");
             throw;
         }
     }
 
-    public async Task DeleteFileAsync(FtpConfiguration configuration, string remotePath)
+    public async Task DeleteFileAsync(
+        FtpConfiguration configuration,
+        string remotePath,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(remotePath);
+
         StaticFileLogger.LogInformation($"Deleting file: {remotePath}");
+
         try
         {
-            var request =
-                (FtpWebRequest)WebRequest.Create(
-                    $"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.DeleteFile;
             request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
 
-            using var response = (FtpWebResponse)await request.GetResponseAsync();
+            using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
             StaticFileLogger.LogInformation($"File deleted: {remotePath}");
         }
-        catch (Exception ex)
+        catch (WebException ex)
         {
             StaticFileLogger.LogError($"Delete failed {remotePath}: {ex.Message}");
             throw;
         }
     }
 
-
-    private FileSystemItem ParseFtpListItem(string line, string currentPath)
+    public async Task DeleteDirectoryAsync(
+        FtpConfiguration configuration,
+        string path,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(path);
+
+        var items = await ListDirectoryAsync(configuration, path, cancellationToken).ConfigureAwait(false);
+
+        foreach (var item in items)
+        {
+            if (item.IsDirectory)
+            {
+                await DeleteDirectoryAsync(configuration, item.FullPath, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await DeleteFileAsync(configuration, item.FullPath, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{path.TrimStart('/')}");
+        var request = (FtpWebRequest)WebRequest.Create(uri);
+        request.Method = WebRequestMethods.Ftp.RemoveDirectory;
+        request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+
+        using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
+    }
+#pragma warning restore SYSLIB0014
+
+    private static FileSystemItem? ParseFtpListItem(string line, string currentPath)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        ArgumentNullException.ThrowIfNull(currentPath);
+
         try
         {
-            var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var parts = line.Split([' '], StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length < 4) return null;
 
             DateTime modifiedDate;
             var dateString = $"{parts[^4]} {parts[^3]} {parts[^2]}";
 
-            var formats = new[]
-            {
+            string[] formats =
+            [
                 "MMM dd yyyy",
                 "MMM dd HH:mm",
                 "MMM dd hh:mm",
                 "yyyy-MM-dd HH:mm",
                 "dd MMM yyyy",
                 "dd MMM HH:mm"
-            };
+            ];
 
             if (!DateTime.TryParseExact(dateString,
                     formats,
@@ -275,12 +334,13 @@ public class FtpService : IFtpService
             {
                 var monthDay = $"{parts[^4]} {parts[^3]}";
                 if (DateTime.TryParseExact(monthDay,
-                        new[] { "MMM dd", "dd MMM" },
+                        ["MMM dd", "dd MMM"],
                         CultureInfo.InvariantCulture,
                         DateTimeStyles.None,
                         out var partialDate))
                 {
-                    modifiedDate = new DateTime(DateTime.Now.Year, partialDate.Month, partialDate.Day);
+                    modifiedDate = new DateTime(DateTime.Now.Year, partialDate.Month, partialDate.Day, 0, 0, 0,
+                        DateTimeKind.Local);
                 }
                 else
                 {
@@ -297,31 +357,13 @@ public class FtpService : IFtpService
                 Modified = modifiedDate
             };
         }
-        catch (Exception ex)
+        catch (FormatException)
         {
             return null;
         }
-    }
-    
-    public async Task DeleteDirectoryAsync(FtpConfiguration configuration, string path)
-    {
-        var items = await ListDirectoryAsync(configuration, path);
-        foreach (var item in items)
+        catch (ArgumentOutOfRangeException)
         {
-            if (item.IsDirectory)
-            {
-                await DeleteDirectoryAsync(configuration, item.FullPath);
-            }
-            else
-            {
-                await DeleteFileAsync(configuration, item.FullPath);
-            }
+            return null;
         }
-
-        var request = (FtpWebRequest)WebRequest.Create($"{configuration.FtpAddress.TrimEnd('/')}/{path.TrimStart('/')}");
-        request.Method = WebRequestMethods.Ftp.RemoveDirectory;
-        request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
-        
-        using var response = (FtpWebResponse)await request.GetResponseAsync();
     }
 }

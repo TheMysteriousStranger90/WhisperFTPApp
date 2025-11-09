@@ -7,29 +7,40 @@ using Avalonia.Platform;
 
 namespace WhisperFTPApp.Converters;
 
-public class WindowBackgroundConverter : IValueConverter
+internal sealed class WindowBackgroundConverter : IValueConverter
 {
     public static readonly WindowBackgroundConverter Instance = new();
 
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is string path)
         {
             try
             {
-                if (path.StartsWith("avares://"))
+                if (path.StartsWith("avares://", StringComparison.Ordinal))
                 {
                     var uri = new Uri(path);
-                    var stream = AssetLoader.Open(uri);
-                    return new ImageBrush(new Bitmap(stream))
+                    using (var stream = AssetLoader.Open(uri))
                     {
-                        Stretch = Stretch.UniformToFill
-                    };
+                        using (var bitmap = new Bitmap(stream))
+                        {
+                            return new ImageBrush(bitmap)
+                            {
+                                Stretch = Stretch.UniformToFill
+                            };
+                        }
+                    }
                 }
-                return new ImageBrush(new Bitmap(path))
+                else
                 {
-                    Stretch = Stretch.UniformToFill
-                };
+                    using (var bitmap = new Bitmap(path))
+                    {
+                        return new ImageBrush(bitmap)
+                        {
+                            Stretch = Stretch.UniformToFill
+                        };
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -37,10 +48,11 @@ public class WindowBackgroundConverter : IValueConverter
                 return null;
             }
         }
+
         return null;
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         throw new NotImplementedException();
     }
