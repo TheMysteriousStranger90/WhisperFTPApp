@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using WhisperFTPApp.Configurations;
 using WhisperFTPApp.Data;
 using WhisperFTPApp.Services;
 using WhisperFTPApp.Services.Interfaces;
@@ -12,9 +13,11 @@ internal static class ServiceCollectionExtensions
 {
     public static void AddCommonServices(this IServiceCollection collection)
     {
+        var dbPath = PathManager.GetDatabasePath();
+
         collection.AddDbContextFactory<AppDbContext>(options =>
         {
-            options.UseSqlite("Data Source=DatabaseWhisperFTPApp.db",
+            options.UseSqlite($"Data Source={dbPath}",
                 sqliteOptions =>
                 {
                     sqliteOptions.CommandTimeout(30);
@@ -25,7 +28,6 @@ internal static class ServiceCollectionExtensions
             options.EnableDetailedErrors();
 #endif
         });
-
 
         collection.AddSingleton<ISettingsService, SettingsService>();
         collection.AddSingleton<IFtpService, FtpService>();

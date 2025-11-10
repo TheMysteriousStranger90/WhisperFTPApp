@@ -4,6 +4,7 @@ using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using WhisperFTPApp.Configurations;
 using WhisperFTPApp.Data;
 using WhisperFTPApp.Extensions;
 using WhisperFTPApp.Logger;
@@ -70,7 +71,8 @@ public partial class App : Application
     {
         try
         {
-            StaticFileLogger.LogInformation("Initializing database...");
+            var dbPath = PathManager.GetDatabasePath();
+            StaticFileLogger.LogInformation($"Initializing database at: {dbPath}");
 
             var contextFactory = serviceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
 
