@@ -31,6 +31,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
     private ObservableCollection<string> _localFiles = new();
     private ObservableCollection<string> _ftpFiles = new();
     private ObservableCollection<FileSystemItem> _ftpItems = new();
+    public ObservableCollection<string>? DriveNames { get; private set; }
     private double _transferProgress;
     private string _statusMessage = string.Empty;
     private string _currentDirectory = "/";
@@ -79,10 +80,18 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         set
         {
             this.RaiseAndSetIfChanged(ref _selectedDrive, value);
-            if (value != null)
+            if (value != null && value.IsReady)
             {
-                LocalCurrentPath = value.RootDirectory.FullName;
-                _ = RefreshLocalFiles();
+                try
+                {
+                    LocalCurrentPath = value.RootDirectory.FullName;
+                    _ = RefreshLocalFiles();
+                    StatusMessage = $"Selected drive: {value.Name}";
+                }
+                catch (Exception ex)
+                {
+                    StatusMessage = $"Error accessing drive: {ex.Message}";
+                }
             }
         }
     }
@@ -716,7 +725,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             var items = new List<FileSystemItem>();
             var currentDir = new DirectoryInfo(LocalCurrentPath);
 
-            if (currentDir.Parent != null)
+            if (currentDir.Parent != null && !string.IsNullOrEmpty(currentDir.Parent.FullName))
             {
                 items.Add(new FileSystemItem
                 {
@@ -730,35 +739,58 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
             foreach (var dir in currentDir.GetDirectories())
             {
-                items.Add(new FileSystemItem
+                try
                 {
-                    Name = dir.Name,
-                    FullPath = dir.FullName,
-                    IsDirectory = true,
-                    Modified = dir.LastWriteTime,
-                    Type = "Directory"
-                });
+                    items.Add(new FileSystemItem
+                    {
+                        Name = dir.Name,
+                        FullPath = dir.FullName,
+                        IsDirectory = true,
+                        Modified = dir.LastWriteTime,
+                        Type = "Directory"
+                    });
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    StaticFileLogger.LogError($"Access denied: {ex.Message}");
+                }
             }
 
             foreach (var file in currentDir.GetFiles())
             {
-                items.Add(new FileSystemItem
+                try
                 {
-                    Name = file.Name,
-                    FullPath = file.FullName,
-                    IsDirectory = false,
-                    Size = file.Length,
-                    Modified = file.LastWriteTime,
-                    Type = file.Extension
-                });
+                    items.Add(new FileSystemItem
+                    {
+                        Name = file.Name,
+                        FullPath = file.FullName,
+                        IsDirectory = false,
+                        Size = file.Length,
+                        Modified = file.LastWriteTime,
+                        Type = file.Extension
+                    });
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    StaticFileLogger.LogError($"Access denied: {ex.Message}");
+                }
             }
 
             LocalItems = new ObservableCollection<FileSystemItem>(items);
             UpdateLocalStats();
+            StatusMessage = $"Loaded {items.Count} items from {LocalCurrentPath}";
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            StatusMessage = $"Access denied: {ex.Message}";
+            StaticFileLogger.LogError($"Access denied: {ex.Message}");
+            LocalItems = new ObservableCollection<FileSystemItem>();
         }
         catch (Exception ex)
         {
             StatusMessage = $"Error accessing directory: {ex.Message}";
+            StaticFileLogger.LogError($"Error accessing directory: {ex.Message}");
+            LocalItems = new ObservableCollection<FileSystemItem>();
         }
 
         return Task.CompletedTask;
@@ -927,9 +959,9 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
     private void InitializeLocalNavigation()
     {
-        _availableDrives = new ObservableCollection<DriveInfo>(DriveInfo.GetDrives());
-        _localItems = new ObservableCollection<FileSystemItem>();
-        SelectedDrive = _availableDrives.FirstOrDefault();
+        AvailableDrives = new ObservableCollection<DriveInfo>(DriveInfo.GetDrives());
+        LocalItems = new ObservableCollection<FileSystemItem>();
+        SelectedDrive = AvailableDrives.FirstOrDefault();
     }
 
     private void NavigateLocalUp()
