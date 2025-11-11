@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.IO;
-using System.Linq;
+﻿using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Net;
 using System.Reactive;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform.Storage;
 using ReactiveUI;
 using WhisperFTPApp.Commands;
 using WhisperFTPApp.Configurations;
@@ -21,34 +17,44 @@ using WhisperFTPApp.Views;
 
 namespace WhisperFTPApp.ViewModels;
 
-public class MainWindowViewModel : ViewModelBase
+public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 {
     private readonly LocalizationService _localizationService;
     private readonly ISettingsService _settingsService;
-    private readonly IWifiScannerService _scannerService;
-    private string _selectedPath;
-    private string _ftpAddress;
-    private string _username;
-    private string _password;
-    private ObservableCollection<string> _localFiles;
-    private ObservableCollection<string> _ftpFiles;
-    private ObservableCollection<FileSystemItem> _ftpItems;
-    private double _transferProgress;
     private readonly IFtpService _ftpService;
-    private string _statusMessage;
+    private readonly IBackgroundService _backgroundService;
+
+    private string _selectedPath = string.Empty;
+    private string _ftpAddress = string.Empty;
+    private string _username = string.Empty;
+    private string _password = string.Empty;
+    private ObservableCollection<string> _localFiles = new();
+    private ObservableCollection<string> _ftpFiles = new();
+    private ObservableCollection<FileSystemItem> _ftpItems = new();
+    public ObservableCollection<string>? DriveNames { get; private set; }
+    private double _transferProgress;
+    private string _statusMessage = string.Empty;
     private string _currentDirectory = "/";
-    private FileSystemItem _selectedFtpItem;
-    private string _selectedLocalFile;
-    private ObservableCollection<DriveInfo> _availableDrives;
-    private DriveInfo _selectedDrive;
-    private FileSystemItem _rootDirectory;
-    private ObservableCollection<FileSystemItem> _localItems;
-    private FileSystemItem _selectedLocalItem;
-    private string _localCurrentPath;
-    private FileStats _localFileStats;
-    private FileStats _remoteFileStats;
+    private FileSystemItem? _selectedFtpItem;
+    private string _selectedLocalFile = string.Empty;
+    private ObservableCollection<DriveInfo> _availableDrives = new();
+    private DriveInfo? _selectedDrive;
+    private ObservableCollection<FileSystemItem> _localItems = new();
+    private FileSystemItem? _selectedLocalItem;
+    private string _localCurrentPath = string.Empty;
+    private FileStats _localFileStats = new();
+    private FileStats _remoteFileStats = new();
     private string _port = "21";
+    private bool _isConnected;
+    private bool _isTransferring;
+    private readonly ObservableCollection<BreadcrumbItem> _breadcrumbs = new();
+    private readonly ObservableCollection<FtpConnectionEntity> _recentConnections = new();
+    private FtpConnectionEntity? _selectedRecentConnection;
+    private Control _currentView;
+    private readonly Control _mainView;
+    private readonly Control _settingsView;
     private readonly Control _scanView;
+    private string _backgroundPath = string.Empty;
 
     public string Port
     {
@@ -56,15 +62,11 @@ public class MainWindowViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _port, value);
     }
 
-    private bool _isConnected;
-
     public bool IsConnected
     {
         get => _isConnected;
         set => this.RaiseAndSetIfChanged(ref _isConnected, value);
     }
-
-    private bool _isTransferring;
 
     public bool IsTransferring
     {
@@ -72,16 +74,24 @@ public class MainWindowViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _isTransferring, value);
     }
 
-    public DriveInfo SelectedDrive
+    public DriveInfo? SelectedDrive
     {
         get => _selectedDrive;
         set
         {
             this.RaiseAndSetIfChanged(ref _selectedDrive, value);
-            if (value != null)
+            if (value != null && value.IsReady)
             {
-                LocalCurrentPath = value.RootDirectory.FullName;
-                RefreshLocalFiles();
+                try
+                {
+                    LocalCurrentPath = value.RootDirectory.FullName;
+                    _ = RefreshLocalFiles();
+                    StatusMessage = $"Selected drive: {value.Name}";
+                }
+                catch (Exception ex)
+                {
+                    StatusMessage = $"Error accessing drive: {ex.Message}";
+                }
             }
         }
     }
@@ -92,7 +102,7 @@ public class MainWindowViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _localCurrentPath, value);
     }
 
-    public FileSystemItem SelectedLocalItem
+    public FileSystemItem? SelectedLocalItem
     {
         get => _selectedLocalItem;
         set
@@ -118,10 +128,8 @@ public class MainWindowViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _remoteFileStats, value);
     }
 
-    private readonly ObservableCollection<BreadcrumbItem> _breadcrumbs;
     public ObservableCollection<BreadcrumbItem> Breadcrumbs => _breadcrumbs;
     public ReactiveCommand<NavigationItem, Unit> NavigateCommand { get; }
-    private readonly ObservableCollection<FtpConnectionEntity> _recentConnections;
     public ICommand NavigateToPathCommand { get; }
 
     public string StatusMessage
@@ -136,7 +144,7 @@ public class MainWindowViewModel : ViewModelBase
         set => this.RaiseAndSetIfChanged(ref _currentDirectory, value);
     }
 
-    public FileSystemItem SelectedFtpItem
+    public FileSystemItem? SelectedFtpItem
     {
         get => _selectedFtpItem;
         set
@@ -189,36 +197,36 @@ public class MainWindowViewModel : ViewModelBase
     public ObservableCollection<FileSystemItem> LocalItems
     {
         get => _localItems;
-        set => this.RaiseAndSetIfChanged(ref _localItems, value);
+        private set => this.RaiseAndSetIfChanged(ref _localItems, value);
     }
 
     public ObservableCollection<string> LocalFiles
     {
         get => _localFiles;
-        set => this.RaiseAndSetIfChanged(ref _localFiles, value);
+        private set => this.RaiseAndSetIfChanged(ref _localFiles, value);
     }
 
     public ObservableCollection<string> FtpFiles
     {
         get => _ftpFiles;
-        set => this.RaiseAndSetIfChanged(ref _ftpFiles, value);
+        private set => this.RaiseAndSetIfChanged(ref _ftpFiles, value);
     }
 
     public ObservableCollection<FileSystemItem> FtpItems
     {
         get => _ftpItems;
-        set => this.RaiseAndSetIfChanged(ref _ftpItems, value);
+        private set => this.RaiseAndSetIfChanged(ref _ftpItems, value);
     }
 
     public ObservableCollection<DriveInfo> AvailableDrives
     {
         get => _availableDrives;
-        set => this.RaiseAndSetIfChanged(ref _availableDrives, value);
+        private set => this.RaiseAndSetIfChanged(ref _availableDrives, value);
     }
 
     public ReactiveCommand<FileSystemItem, Unit> NavigateToLocalDirectoryCommand { get; }
     public ReactiveCommand<Unit, Unit> NavigateLocalUpCommand { get; }
-    public ReactiveCommand<Unit, Task> RefreshLocalCommand { get; }
+    public ReactiveCommand<Unit, Unit> RefreshLocalCommand { get; }
     public ReactiveCommand<Unit, Unit> ConnectCommand { get; }
     public ReactiveCommand<Unit, Unit> UploadCommand { get; }
     public ReactiveCommand<Unit, Unit> BrowseCommand { get; }
@@ -230,14 +238,14 @@ public class MainWindowViewModel : ViewModelBase
     public ReactiveCommand<Unit, Unit> SaveConnectionCommand { get; }
     public ReactiveCommand<Unit, Unit> DisconnectCommand { get; }
     public ReactiveCommand<Unit, Unit> CleanCommand { get; }
-    private FtpConnectionEntity _selectedRecentConnection;
     public ObservableCollection<FtpConnectionEntity> RecentConnections => _recentConnections;
     public ReactiveCommand<Unit, Unit> ShowRecentConnectionsCommand { get; }
     public ReactiveCommand<FtpConnectionEntity, Unit> DeleteConnectionCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowMainViewCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowScanViewCommand { get; }
+    public ReactiveCommand<Unit, Unit> ShowSettingsCommand { get; }
 
-    public FtpConnectionEntity SelectedRecentConnection
+    public FtpConnectionEntity? SelectedRecentConnection
     {
         get => _selectedRecentConnection;
         set
@@ -249,20 +257,12 @@ public class MainWindowViewModel : ViewModelBase
             }
         }
     }
-    
-    public ReactiveCommand<Unit, Unit> ShowSettingsCommand { get; }
-    private Control _currentView;
-    private readonly Control _mainView;
-    private readonly Control _settingsView;
 
     public Control CurrentView
     {
         get => _currentView;
         private set => this.RaiseAndSetIfChanged(ref _currentView, value);
     }
-    
-    private readonly IBackgroundService _backgroundService;
-    private string _backgroundPath;
 
     public string BackgroundPath
     {
@@ -271,28 +271,33 @@ public class MainWindowViewModel : ViewModelBase
     }
 
     public MainWindowViewModel(
-        IFtpService ftpService, 
-        ISettingsService settingsService, 
+        IFtpService ftpService,
+        ISettingsService settingsService,
         IBackgroundService backgroundService,
         IWifiScannerService scannerService)
     {
+        ArgumentNullException.ThrowIfNull(ftpService);
+        ArgumentNullException.ThrowIfNull(settingsService);
+        ArgumentNullException.ThrowIfNull(backgroundService);
+        ArgumentNullException.ThrowIfNull(scannerService);
+
         _localizationService = LocalizationService.Instance;
         _settingsService = settingsService;
-        _scannerService = scannerService;
         _ftpService = ftpService;
-        _breadcrumbs = new ObservableCollection<BreadcrumbItem>();
-        _recentConnections = new ObservableCollection<FtpConnectionEntity>();
+        _backgroundService = backgroundService;
+
         NavigateCommand = ReactiveCommand.CreateFromTask<NavigationItem>(NavigateToItemAsync);
         NavigateUpCommand = ReactiveCommand.CreateFromTask(NavigateUpAsync);
         NavigateToFolderCommand = ReactiveCommand.CreateFromTask<FileSystemItem>(NavigateToFolderAsync);
         SaveConnectionCommand = ReactiveCommand.CreateFromTask(SaveSuccessfulConnection);
         UploadCommand = ReactiveCommand.CreateFromTask(UploadFileAsync);
-        BrowseCommand = ReactiveCommand.Create(BrowseFiles);
+        BrowseCommand = ReactiveCommand.CreateFromTask(BrowseFilesAsync);
         DownloadCommand = ReactiveCommand.CreateFromTask(DownloadFileAsync);
         DeleteCommand = ReactiveCommand.CreateFromTask(DeleteFileAsync);
         RefreshCommand = ReactiveCommand.CreateFromTask(RefreshDirectoryAsync);
         NavigateLocalUpCommand = ReactiveCommand.Create(NavigateLocalUp);
-        RefreshLocalCommand = ReactiveCommand.Create(RefreshLocalFiles);
+        RefreshLocalCommand =
+            ReactiveCommand.CreateFromTask(async () => await RefreshLocalFiles().ConfigureAwait(false));
         NavigateToLocalDirectoryCommand = ReactiveCommand.Create<FileSystemItem>(NavigateToLocalDirectory);
         ConnectCommand = ReactiveCommand.CreateFromTask(
             ConnectToFtpAsync,
@@ -302,8 +307,7 @@ public class MainWindowViewModel : ViewModelBase
             DisconnectAsync,
             this.WhenAnyValue(x => x.IsConnected));
         CleanCommand = ReactiveCommand.Create(CleanFields);
-        LocalFiles = new ObservableCollection<string>();
-        FtpFiles = new ObservableCollection<string>();
+
         NavigateToPathCommand = new BreadcrumbNavigationCommand(path =>
         {
             if (!string.IsNullOrEmpty(path))
@@ -315,50 +319,58 @@ public class MainWindowViewModel : ViewModelBase
         });
         ShowRecentConnectionsCommand = ReactiveCommand.Create(() => { });
         DeleteConnectionCommand = ReactiveCommand.CreateFromTask<FtpConnectionEntity>(DeleteConnectionAsync);
-        ShowMainViewCommand = ReactiveCommand.Create(() => { });
-        LocalFileStats = new FileStats();
-        RemoteFileStats = new FileStats();
-        var mainView = new MainView();
-        var settingsView = new SettingsView();
-        mainView.DataContext = this;
-        settingsView.DataContext = new SettingsWindowViewModel(
-            settingsService, 
-            backgroundService,
-            _localizationService);
+
+        var mainView = new MainView { DataContext = this };
+        var settingsView = new SettingsView
+        {
+            DataContext = new SettingsWindowViewModel(
+                settingsService,
+                backgroundService,
+                _localizationService)
+        };
+        var scanView = new ScanView { DataContext = new ScanWindowViewModel(scannerService) };
+
         _mainView = mainView;
         _settingsView = settingsView;
+        _scanView = scanView;
         _currentView = mainView;
-        ShowMainViewCommand = ReactiveCommand.Create(() => 
+
+        ShowMainViewCommand = ReactiveCommand.Create(() =>
         {
             CurrentView = _mainView;
+            return Unit.Default;
         });
         ShowSettingsCommand = ReactiveCommand.Create(() =>
         {
             CurrentView = _settingsView;
+            return Unit.Default;
         });
-        _backgroundService = backgroundService;
-        BackgroundPath = backgroundService.CurrentBackground;
-        _backgroundService.BackgroundChanged
-            .Subscribe(path => BackgroundPath = path);
-        
-        _scanView = new ScanView();
-        _scanView.DataContext = new ScanWindowViewModel(scannerService);
-        
-        ShowScanViewCommand = ReactiveCommand.Create(() => 
+        ShowScanViewCommand = ReactiveCommand.Create(() =>
         {
             CurrentView = _scanView;
+            return Unit.Default;
         });
 
-        LoadRecentConnections();
+        BackgroundPath = backgroundService.CurrentBackground;
+        _backgroundService.BackgroundChanged.Subscribe(path => BackgroundPath = path);
+
+        _ = LoadRecentConnectionsAsync();
         InitializeLocalNavigation();
     }
 
-    private void NavigateToLocalDirectory(FileSystemItem item)
+    private void NavigateToLocalDirectory(FileSystemItem? item)
     {
         if (item == null || !item.IsDirectory) return;
 
         LocalCurrentPath = item.FullPath;
-        RefreshLocalFiles();
+        _ = RefreshLocalFiles();
+    }
+
+    private void NavigateToLocalDirectory(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        LocalCurrentPath = path;
+        _ = RefreshLocalFiles();
     }
 
     private void UpdateRemoteStats()
@@ -372,21 +384,26 @@ public class MainWindowViewModel : ViewModelBase
         };
     }
 
-    private async void BrowseFiles()
+    private async Task BrowseFilesAsync()
     {
-        var dialog = new OpenFolderDialog();
-        var selectedPath =
-            await dialog.ShowAsync(App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-                ? desktop.MainWindow
-                : null);
+        var topLevel = TopLevel.GetTopLevel(_currentView);
+        if (topLevel?.StorageProvider == null) return;
 
-        if (!string.IsNullOrEmpty(selectedPath))
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
+            Title = "Select Folder",
+            AllowMultiple = false
+        }).ConfigureAwait(true);
+
+        if (folders.Count > 0)
+        {
+            var selectedPath = folders[0].Path.LocalPath;
             SelectedPath = selectedPath;
-            LocalFiles.Clear();
-            foreach (var file in Directory.GetFiles(SelectedPath))
+            var files = Directory.GetFiles(selectedPath);
+            _localFiles.Clear();
+            foreach (var file in files)
             {
-                LocalFiles.Add(file);
+                _localFiles.Add(file);
             }
         }
     }
@@ -398,7 +415,7 @@ public class MainWindowViewModel : ViewModelBase
         try
         {
             StatusMessage = "Connecting to FTP server...";
-            FtpItems?.Clear();
+            _ftpItems.Clear();
             UpdateRemoteStats();
 
             if (!int.TryParse(Port, out int portNumber))
@@ -422,17 +439,17 @@ public class MainWindowViewModel : ViewModelBase
                 portNumber,
                 timeout: 10000);
 
-            bool isConnected = await _ftpService.ConnectAsync(configuration);
+            bool isConnected = await _ftpService.ConnectAsync(configuration).ConfigureAwait(true);
             if (isConnected)
             {
                 IsConnected = true;
                 StatusMessage = "Connected successfully";
                 StaticFileLogger.LogInformation($"Successfully connected to {FtpAddress}");
-                var items = await _ftpService.ListDirectoryAsync(configuration);
+                var items = await _ftpService.ListDirectoryAsync(configuration).ConfigureAwait(true);
                 FtpItems = new ObservableCollection<FileSystemItem>(items);
                 UpdateRemoteStats();
 
-                await SaveSuccessfulConnection();
+                await SaveSuccessfulConnection().ConfigureAwait(true);
             }
             else
             {
@@ -446,7 +463,7 @@ public class MainWindowViewModel : ViewModelBase
             IsConnected = false;
             StatusMessage = $"Connection error: {ex.Message}";
             StaticFileLogger.LogError($"Connection error: {ex.Message}");
-            FtpItems?.Clear();
+            _ftpItems.Clear();
             UpdateRemoteStats();
         }
         finally
@@ -476,18 +493,20 @@ public class MainWindowViewModel : ViewModelBase
 
             if (SelectedLocalItem.IsDirectory)
             {
-                await UploadDirectoryAsync(configuration, SelectedLocalItem, targetDirectory, progress);
+                await UploadDirectoryAsync(configuration, SelectedLocalItem, targetDirectory, progress)
+                    .ConfigureAwait(true);
             }
             else
             {
                 var remotePath = Path.Combine(targetDirectory, SelectedLocalItem.Name).Replace('\\', '/');
                 StatusMessage = $"Uploading {SelectedLocalItem.Name}...";
-                await _ftpService.UploadFileAsync(configuration, SelectedLocalItem.FullPath, remotePath, progress);
+                await _ftpService.UploadFileAsync(configuration, SelectedLocalItem.FullPath, remotePath, progress)
+                    .ConfigureAwait(true);
             }
 
-            await RefreshDirectoryAsync();
+            await RefreshDirectoryAsync().ConfigureAwait(true);
             StatusMessage = "Upload complete";
-            StaticFileLogger.LogInformation($"Upload completed");
+            StaticFileLogger.LogInformation("Upload completed");
         }
         catch (Exception ex)
         {
@@ -501,16 +520,29 @@ public class MainWindowViewModel : ViewModelBase
         }
     }
 
+#pragma warning disable SYSLIB0014 // WebRequest is obsolete but required for FTP
     private async Task UploadDirectoryAsync(FtpConfiguration config, FileSystemItem directory, string remotePath,
         IProgress<double> progress)
     {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(directory);
+        ArgumentNullException.ThrowIfNull(remotePath);
+
         var targetPath = Path.Combine(remotePath, directory.Name).Replace('\\', '/');
 
-        var createDirRequest =
-            (FtpWebRequest)WebRequest.Create($"{config.FtpAddress.TrimEnd('/')}/{targetPath.TrimStart('/')}");
+        var uri = new Uri($"{config.FtpAddress.TrimEnd('/')}/{targetPath.TrimStart('/')}");
+        var createDirRequest = (FtpWebRequest)WebRequest.Create(uri);
         createDirRequest.Method = WebRequestMethods.Ftp.MakeDirectory;
         createDirRequest.Credentials = new NetworkCredential(config.Username, config.Password);
-        await createDirRequest.GetResponseAsync();
+
+        try
+        {
+            using var response = await createDirRequest.GetResponseAsync().ConfigureAwait(true);
+        }
+        catch (WebException)
+        {
+            // Directory might already exist, continue
+        }
 
         var files = Directory.GetFiles(directory.FullPath);
         var dirs = Directory.GetDirectories(directory.FullPath);
@@ -522,7 +554,7 @@ public class MainWindowViewModel : ViewModelBase
             var fileName = Path.GetFileName(file);
             var remoteFilePath = Path.Combine(targetPath, fileName).Replace('\\', '/');
             StatusMessage = $"Uploading {fileName}...";
-            await _ftpService.UploadFileAsync(config, file, remoteFilePath, progress);
+            await _ftpService.UploadFileAsync(config, file, remoteFilePath, progress).ConfigureAwait(true);
             currentItem++;
             progress.Report((double)currentItem / totalItems * 100);
         }
@@ -535,11 +567,12 @@ public class MainWindowViewModel : ViewModelBase
                 FullPath = dir,
                 IsDirectory = true
             };
-            await UploadDirectoryAsync(config, subDir, targetPath, progress);
+            await UploadDirectoryAsync(config, subDir, targetPath, progress).ConfigureAwait(true);
             currentItem++;
             progress.Report((double)currentItem / totalItems * 100);
         }
     }
+#pragma warning restore SYSLIB0014
 
     private async Task DownloadFileAsync()
     {
@@ -558,18 +591,20 @@ public class MainWindowViewModel : ViewModelBase
 
             if (SelectedFtpItem.IsDirectory)
             {
-                await DownloadDirectoryAsync(configuration, SelectedFtpItem, LocalCurrentPath, progress);
+                await DownloadDirectoryAsync(configuration, SelectedFtpItem, LocalCurrentPath, progress)
+                    .ConfigureAwait(true);
             }
             else
             {
                 var localPath = Path.Combine(LocalCurrentPath, SelectedFtpItem.Name);
                 StatusMessage = $"Downloading {SelectedFtpItem.Name}...";
-                await _ftpService.DownloadFileAsync(configuration, SelectedFtpItem.FullPath, localPath, progress);
+                await _ftpService.DownloadFileAsync(configuration, SelectedFtpItem.FullPath, localPath, progress)
+                    .ConfigureAwait(true);
             }
 
-            await RefreshLocalFiles();
+            await RefreshLocalFiles().ConfigureAwait(true);
             StatusMessage = "Download complete";
-            StaticFileLogger.LogInformation($"Download completed");
+            StaticFileLogger.LogInformation("Download completed");
         }
         catch (Exception ex)
         {
@@ -586,10 +621,14 @@ public class MainWindowViewModel : ViewModelBase
     private async Task DownloadDirectoryAsync(FtpConfiguration config, FileSystemItem directory, string localPath,
         IProgress<double> progress)
     {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(directory);
+        ArgumentNullException.ThrowIfNull(localPath);
+
         var targetPath = Path.Combine(localPath, directory.Name);
         Directory.CreateDirectory(targetPath);
 
-        var items = await _ftpService.ListDirectoryAsync(config, directory.FullPath);
+        var items = await _ftpService.ListDirectoryAsync(config, directory.FullPath).ConfigureAwait(true);
         var totalItems = items.Count();
         var currentItem = 0;
 
@@ -597,13 +636,13 @@ public class MainWindowViewModel : ViewModelBase
         {
             if (item.IsDirectory)
             {
-                await DownloadDirectoryAsync(config, item, targetPath, progress);
+                await DownloadDirectoryAsync(config, item, targetPath, progress).ConfigureAwait(true);
             }
             else
             {
                 var itemPath = Path.Combine(targetPath, item.Name);
                 StatusMessage = $"Downloading {item.Name}...";
-                await _ftpService.DownloadFileAsync(config, item.FullPath, itemPath, progress);
+                await _ftpService.DownloadFileAsync(config, item.FullPath, itemPath, progress).ConfigureAwait(true);
             }
 
             currentItem++;
@@ -618,11 +657,11 @@ public class MainWindowViewModel : ViewModelBase
             StatusMessage = "No item selected for deletion";
             return;
         }
-    
+
         IsTransferring = true;
         var itemToDelete = SelectedFtpItem;
         var itemName = itemToDelete.Name;
-    
+
         StaticFileLogger.LogInformation($"Attempting to delete {itemName}");
         try
         {
@@ -631,16 +670,16 @@ public class MainWindowViewModel : ViewModelBase
 
             if (itemToDelete.IsDirectory)
             {
-                await _ftpService.DeleteDirectoryAsync(configuration, itemToDelete.FullPath);
+                await _ftpService.DeleteDirectoryAsync(configuration, itemToDelete.FullPath).ConfigureAwait(true);
             }
             else
             {
-                await _ftpService.DeleteFileAsync(configuration, itemToDelete.FullPath);
+                await _ftpService.DeleteFileAsync(configuration, itemToDelete.FullPath).ConfigureAwait(true);
             }
-        
+
             SelectedFtpItem = null;
-            await RefreshDirectoryAsync();
-        
+            await RefreshDirectoryAsync().ConfigureAwait(true);
+
             StatusMessage = $"Successfully deleted {itemName}";
             StaticFileLogger.LogInformation($"Delete completed: {itemName}");
         }
@@ -661,33 +700,32 @@ public class MainWindowViewModel : ViewModelBase
         {
             StatusMessage = "Refreshing directory...";
             var configuration = CreateConfiguration();
-            var items = await _ftpService.ListDirectoryAsync(configuration, CurrentDirectory);
-            FtpItems.Clear();
+            var items = await _ftpService.ListDirectoryAsync(configuration, CurrentDirectory).ConfigureAwait(true);
+            _ftpItems.Clear();
             foreach (var item in items)
             {
-                FtpItems.Add(item);
+                _ftpItems.Add(item);
             }
 
             StatusMessage = "Directory refreshed";
-
             UpdateRemoteStats();
         }
         catch (Exception ex)
         {
             StatusMessage = $"Refresh failed: {ex.Message}";
-            FtpItems?.Clear();
+            _ftpItems.Clear();
             UpdateRemoteStats();
         }
     }
 
-    private async Task RefreshLocalFiles()
+    private Task RefreshLocalFiles()
     {
         try
         {
             var items = new List<FileSystemItem>();
             var currentDir = new DirectoryInfo(LocalCurrentPath);
 
-            if (currentDir.Parent != null)
+            if (currentDir.Parent != null && !string.IsNullOrEmpty(currentDir.Parent.FullName))
             {
                 items.Add(new FileSystemItem
                 {
@@ -701,36 +739,61 @@ public class MainWindowViewModel : ViewModelBase
 
             foreach (var dir in currentDir.GetDirectories())
             {
-                items.Add(new FileSystemItem
+                try
                 {
-                    Name = dir.Name,
-                    FullPath = dir.FullName,
-                    IsDirectory = true,
-                    Modified = dir.LastWriteTime,
-                    Type = "Directory"
-                });
+                    items.Add(new FileSystemItem
+                    {
+                        Name = dir.Name,
+                        FullPath = dir.FullName,
+                        IsDirectory = true,
+                        Modified = dir.LastWriteTime,
+                        Type = "Directory"
+                    });
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    StaticFileLogger.LogError($"Access denied: {ex.Message}");
+                }
             }
 
             foreach (var file in currentDir.GetFiles())
             {
-                items.Add(new FileSystemItem
+                try
                 {
-                    Name = file.Name,
-                    FullPath = file.FullName,
-                    IsDirectory = false,
-                    Size = file.Length,
-                    Modified = file.LastWriteTime,
-                    Type = file.Extension
-                });
+                    items.Add(new FileSystemItem
+                    {
+                        Name = file.Name,
+                        FullPath = file.FullName,
+                        IsDirectory = false,
+                        Size = file.Length,
+                        Modified = file.LastWriteTime,
+                        Type = file.Extension
+                    });
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    StaticFileLogger.LogError($"Access denied: {ex.Message}");
+                }
             }
 
             LocalItems = new ObservableCollection<FileSystemItem>(items);
             UpdateLocalStats();
+            StatusMessage = $"Loaded {items.Count} items from {LocalCurrentPath}";
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            StatusMessage = $"Access denied: {ex.Message}";
+            StaticFileLogger.LogError($"Access denied: {ex.Message}");
+            LocalItems = new ObservableCollection<FileSystemItem>();
         }
         catch (Exception ex)
         {
             StatusMessage = $"Error accessing directory: {ex.Message}";
+            StaticFileLogger.LogError($"Error accessing directory: {ex.Message}");
+            LocalItems = new ObservableCollection<FileSystemItem>();
         }
+
+        return Task.CompletedTask;
     }
 
     private void UpdateLocalStats()
@@ -749,10 +812,10 @@ public class MainWindowViewModel : ViewModelBase
         if (CurrentDirectory == "/") return;
         CurrentDirectory = Path.GetDirectoryName(CurrentDirectory)?.Replace('\\', '/') ?? "/";
         UpdateBreadcrumbs();
-        await RefreshDirectoryAsync();
+        await RefreshDirectoryAsync().ConfigureAwait(true);
     }
 
-    private async Task NavigateToFolderAsync(FileSystemItem item)
+    private async Task NavigateToFolderAsync(FileSystemItem? item)
     {
         try
         {
@@ -778,7 +841,7 @@ public class MainWindowViewModel : ViewModelBase
             StaticFileLogger.LogInformation($"Navigating to: {item.FullPath}");
             CurrentDirectory = item.FullPath;
             UpdateBreadcrumbs();
-            await RefreshDirectoryAsync();
+            await RefreshDirectoryAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
@@ -789,9 +852,10 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task NavigateToItemAsync(NavigationItem item)
     {
+        ArgumentNullException.ThrowIfNull(item);
         CurrentDirectory = item.Path;
         UpdateBreadcrumbs();
-        await RefreshDirectoryAsync();
+        await RefreshDirectoryAsync().ConfigureAwait(true);
     }
 
     private void UpdateBreadcrumbs()
@@ -819,7 +883,8 @@ public class MainWindowViewModel : ViewModelBase
     {
         try
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Saving successful connection: {FtpAddress}");
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"[{DateTime.Now:HH:mm:ss}] Saving successful connection: {FtpAddress}"));
             var connection = new FtpConnectionEntity
             {
                 Name = FtpAddress,
@@ -835,28 +900,32 @@ public class MainWindowViewModel : ViewModelBase
 
             if (existing != null)
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Updating existing connection");
+                Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"[{DateTime.Now:HH:mm:ss}] Updating existing connection"));
                 connections.Remove(existing);
             }
 
             connections.Add(connection);
             var toSave = connections.OrderByDescending(c => c.LastUsed).Take(10).ToList();
 
-            await _settingsService.SaveConnectionsAsync(toSave);
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Connection saved successfully");
-            LoadRecentConnections();
+            await _settingsService.SaveConnectionsAsync(toSave).ConfigureAwait(true);
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"[{DateTime.Now:HH:mm:ss}] Connection saved successfully"));
+            await LoadRecentConnectionsAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error saving connection: {ex.Message}");
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"[{DateTime.Now:HH:mm:ss}] Error saving connection: {ex.Message}"));
         }
     }
 
-    private async void LoadRecentConnections()
+    private async Task LoadRecentConnectionsAsync()
     {
         try
         {
-            var connections = await _settingsService.LoadConnectionsAsync() ?? new List<FtpConnectionEntity>();
+            var connections = await _settingsService.LoadConnectionsAsync().ConfigureAwait(true) ??
+                              new List<FtpConnectionEntity>();
             _recentConnections.Clear();
             foreach (var connection in connections.OrderByDescending(c => c.LastUsed))
             {
@@ -868,14 +937,6 @@ public class MainWindowViewModel : ViewModelBase
             StatusMessage = $"Error loading connections: {ex.Message}";
             _recentConnections.Clear();
         }
-    }
-
-    private async Task NavigateToPathAsync(string path)
-    {
-        if (string.IsNullOrEmpty(path)) return;
-        CurrentDirectory = path;
-        UpdateBreadcrumbs();
-        await RefreshDirectoryAsync();
     }
 
     private FtpConfiguration CreateConfiguration()
@@ -903,12 +964,6 @@ public class MainWindowViewModel : ViewModelBase
         SelectedDrive = AvailableDrives.FirstOrDefault();
     }
 
-    private void NavigateToLocalDirectory(string path)
-    {
-        LocalCurrentPath = path;
-        RefreshLocalFiles();
-    }
-
     private void NavigateLocalUp()
     {
         var parent = Directory.GetParent(LocalCurrentPath);
@@ -923,8 +978,8 @@ public class MainWindowViewModel : ViewModelBase
         StaticFileLogger.LogInformation("Disconnecting from FTP server");
         try
         {
-            await _ftpService.DisconnectAsync();
-            FtpItems?.Clear();
+            await _ftpService.DisconnectAsync().ConfigureAwait(true);
+            _ftpItems.Clear();
             UpdateRemoteStats();
             IsConnected = false;
             StatusMessage = "Disconnected from FTP server";
@@ -948,17 +1003,18 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task SwitchConnectionAsync(FtpConnectionEntity connection)
     {
+        ArgumentNullException.ThrowIfNull(connection);
         try
         {
             if (IsConnected)
             {
-                await DisconnectAsync();
+                await DisconnectAsync().ConfigureAwait(true);
             }
 
             FtpAddress = connection.Address;
             Username = connection.Username;
             Password = connection.Password;
-            await ConnectToFtpAsync();
+            await ConnectToFtpAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
@@ -972,9 +1028,10 @@ public class MainWindowViewModel : ViewModelBase
 
     private async Task DeleteConnectionAsync(FtpConnectionEntity connection)
     {
+        ArgumentNullException.ThrowIfNull(connection);
         try
         {
-            await _settingsService.DeleteConnectionAsync(connection);
+            await _settingsService.DeleteConnectionAsync(connection).ConfigureAwait(true);
             _recentConnections.Remove(connection);
             StatusMessage = "Connection removed from history";
         }
@@ -982,5 +1039,29 @@ public class MainWindowViewModel : ViewModelBase
         {
             StatusMessage = $"Error removing connection: {ex.Message}";
         }
+    }
+
+    public void Dispose()
+    {
+        NavigateCommand?.Dispose();
+        NavigateUpCommand?.Dispose();
+        NavigateToFolderCommand?.Dispose();
+        SaveConnectionCommand?.Dispose();
+        UploadCommand?.Dispose();
+        BrowseCommand?.Dispose();
+        DownloadCommand?.Dispose();
+        DeleteCommand?.Dispose();
+        RefreshCommand?.Dispose();
+        NavigateLocalUpCommand?.Dispose();
+        RefreshLocalCommand?.Dispose();
+        NavigateToLocalDirectoryCommand?.Dispose();
+        ConnectCommand?.Dispose();
+        DisconnectCommand?.Dispose();
+        CleanCommand?.Dispose();
+        ShowRecentConnectionsCommand?.Dispose();
+        DeleteConnectionCommand?.Dispose();
+        ShowMainViewCommand?.Dispose();
+        ShowScanViewCommand?.Dispose();
+        ShowSettingsCommand?.Dispose();
     }
 }

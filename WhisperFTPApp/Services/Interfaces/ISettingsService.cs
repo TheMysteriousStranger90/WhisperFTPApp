@@ -1,14 +1,12 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using WhisperFTPApp.Models;
+﻿using WhisperFTPApp.Models;
 
 namespace WhisperFTPApp.Services.Interfaces;
 
 public interface ISettingsService
 {
-    Task SaveConnectionsAsync(List<FtpConnectionEntity> connections);
-    Task<List<FtpConnectionEntity>> LoadConnectionsAsync();
-    Task DeleteConnectionAsync(FtpConnectionEntity connection);
-    Task SaveBackgroundSettingAsync(string backgroundPath);
-    Task<string> LoadBackgroundSettingAsync();
+    Task SaveConnectionsAsync(IEnumerable<FtpConnectionEntity> connections, CancellationToken cancellationToken = default);
+    Task<List<FtpConnectionEntity>> LoadConnectionsAsync(CancellationToken cancellationToken = default);
+    Task DeleteConnectionAsync(FtpConnectionEntity connection, CancellationToken cancellationToken = default);
+    Task SaveBackgroundSettingAsync(string backgroundPath, CancellationToken cancellationToken = default);
+    Task<string> LoadBackgroundSettingAsync(CancellationToken cancellationToken = default);
 }

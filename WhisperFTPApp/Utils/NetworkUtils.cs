@@ -1,4 +1,4 @@
-﻿using System.Linq;
+﻿using System.Globalization;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
@@ -6,7 +6,7 @@ using NativeWifi;
 
 namespace WhisperFTPApp.Utils;
 
-public static class NetworkUtils
+internal static class NetworkUtils
 {
     public static string GetStringForSSID(Wlan.Dot11Ssid ssid)
     {
@@ -15,10 +15,11 @@ public static class NetworkUtils
 
     public static string GetMacAddress(byte[] macAddr)
     {
-        var str = new string[(int)macAddr.Length];
+        ArgumentNullException.ThrowIfNull(macAddr);
+        var str = new string[macAddr.Length];
         for (int i = 0; i < macAddr.Length; i++)
         {
-            str[i] = macAddr[i].ToString("x2");
+            str[i] = macAddr[i].ToString("x2", CultureInfo.InvariantCulture);
         }
 
         return string.Join(":", str);
@@ -26,12 +27,14 @@ public static class NetworkUtils
 
     public static string GetSecurityType(WlanClient.WlanInterface wlanIface, Wlan.Dot11Ssid ssid)
     {
-        foreach (Wlan.WlanAvailableNetwork network in wlanIface.GetAvailableNetworkList(0))
+        ArgumentNullException.ThrowIfNull(wlanIface);
+
+        var networks = wlanIface.GetAvailableNetworkList(0)
+            .Where(network => GetStringForSSID(network.dot11Ssid) == GetStringForSSID(ssid));
+
+        foreach (var network in networks)
         {
-            if (GetStringForSSID(network.dot11Ssid) == GetStringForSSID(ssid))
-            {
-                return network.dot11DefaultAuthAlgorithm.ToString();
-            }
+            return network.dot11DefaultAuthAlgorithm.ToString();
         }
 
         return "IEEE80211_Open";
@@ -55,9 +58,10 @@ public static class NetworkUtils
 
         return (int)((frequency - 5000000) / 5000);
     }
-    
-    public static string GetLocalIPv4(NetworkInterface adapter)
+
+    public static string? GetLocalIPv4(NetworkInterface adapter)
     {
+        ArgumentNullException.ThrowIfNull(adapter);
         IPInterfaceProperties properties = adapter.GetIPProperties();
         return properties.UnicastAddresses
             .Where(addr => addr.Address.AddressFamily == AddressFamily.InterNetwork)
@@ -67,6 +71,7 @@ public static class NetworkUtils
 
     public static (bool isOpen, string status) CheckFtpPort(string ipAddress)
     {
+        ArgumentNullException.ThrowIfNull(ipAddress);
         try
         {
             using var client = new TcpClient();
@@ -76,7 +81,7 @@ public static class NetworkUtils
             }
             return (false, "Closed");
         }
-        catch
+        catch (Exception)
         {
             return (false, "Filtered");
         }

@@ -1,63 +1,65 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.IO;
+﻿using System.Collections.ObjectModel;
 
 namespace WhisperFTPApp.Models;
 
-public class FileSystemItem
+public sealed class FileSystemItem
 {
-    public string Name { get; set; }
-    public string FullPath { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string FullPath { get; set; } = string.Empty;
     public bool IsDirectory { get; set; }
     public long Size { get; set; }
     public DateTime Modified { get; set; }
-    public string Type { get; set; }
-    public FileSystemItem Parent { get; set; }
-    public ObservableCollection<FileSystemItem> Children { get; set; } = new();
+    public string Type { get; set; } = string.Empty;
+    public FileSystemItem? Parent { get; set; }
+    public ObservableCollection<FileSystemItem> Children { get; } = new();
 
     public string GetRelativePath(string basePath)
     {
-        return FullPath.Replace(basePath, string.Empty).TrimStart('\\', '/');
+        ArgumentNullException.ThrowIfNull(basePath);
+        return FullPath.Replace(basePath, string.Empty, StringComparison.Ordinal).TrimStart('\\', '/');
     }
 
-    public string GetParentPath()
-    {
-        return Parent?.FullPath ?? Path.GetDirectoryName(FullPath);
-    }
+    public string? ParentPath => Parent?.FullPath ?? Path.GetDirectoryName(FullPath);
 
     public void AddChild(FileSystemItem child)
     {
+        ArgumentNullException.ThrowIfNull(child);
         child.Parent = this;
         Children.Add(child);
     }
 
     public void RemoveChild(FileSystemItem child)
     {
+        ArgumentNullException.ThrowIfNull(child);
         child.Parent = null;
         Children.Remove(child);
     }
 
-    public FileSystemItem GetRoot()
+    public FileSystemItem Root
     {
-        var current = this;
-        while (current.Parent != null)
+        get
         {
-            current = current.Parent;
+            var current = this;
+            while (current.Parent != null)
+            {
+                current = current.Parent;
+            }
+
+            return current;
         }
-        return current;
     }
 
-    public List<FileSystemItem> GetPathToRoot()
+    public IReadOnlyList<FileSystemItem> GetPathToRoot()
     {
         var path = new List<FileSystemItem>();
-        var current = this;
+        var current = (FileSystemItem?)this;
         while (current != null)
         {
             path.Add(current);
             current = current.Parent;
         }
+
         path.Reverse();
-        return path;
+        return path.AsReadOnly();
     }
 }

@@ -1,10 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Reactive;
-using System.Threading;
 using ReactiveUI;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Services;
@@ -13,11 +10,14 @@ using WhisperFTPApp.Settings;
 
 namespace WhisperFTPApp.ViewModels;
 
-public class SettingsWindowViewModel : ViewModelBase
+internal sealed class SettingsWindowViewModel : ReactiveObject
 {
     private readonly LocalizationService _localizationService;
-    public ObservableCollection<CultureInfo> AvailableLanguages { get; }
+    private readonly IBackgroundService _backgroundService;
     private CultureInfo _selectedLanguage;
+    private string _selectedBackground;
+
+    public ObservableCollection<CultureInfo> AvailableLanguages { get; }
 
     public CultureInfo SelectedLanguage
     {
@@ -31,11 +31,10 @@ public class SettingsWindowViewModel : ViewModelBase
             }
         }
     }
-    private string LogFilePath => StaticFileLogger.GetLogFolderPath();
+
+    public static string LogFilePath => StaticFileLogger.LogFolderPath;
+
     public ReactiveCommand<Unit, Unit> OpenLogFolderCommand { get; }
-    private readonly ISettingsService _settingsService;
-    private readonly IBackgroundService _backgroundService;
-    private string _selectedBackground;
 
     public BackgroundSettings BackgroundSettings { get; } = new();
 
@@ -51,27 +50,35 @@ public class SettingsWindowViewModel : ViewModelBase
 
     public SettingsWindowViewModel(ISettingsService settingsService, IBackgroundService backgroundService, LocalizationService localizationService)
     {
-        _settingsService = settingsService;
+        ArgumentNullException.ThrowIfNull(settingsService);
+        ArgumentNullException.ThrowIfNull(backgroundService);
+        ArgumentNullException.ThrowIfNull(localizationService);
+
         _backgroundService = backgroundService;
         _selectedBackground = _backgroundService.CurrentBackground;
 
         OpenLogFolderCommand = ReactiveCommand.Create(() =>
         {
-            var path = Path.GetDirectoryName(LogFilePath);
-            if (path != null)
+            var path = LogFilePath;
+            if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
             {
-                Process.Start("explorer.exe", path);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true,
+                    Verb = "open"
+                });
                 StaticFileLogger.LogInformation("Log folder opened by user");
             }
         });
-        
+
         _localizationService = localizationService;
-        AvailableLanguages = new ObservableCollection<CultureInfo>
-        {
-            new("en"),
-            new("ru-RU")
-        };
-        _selectedLanguage = AvailableLanguages.First(l => 
+        AvailableLanguages =
+        [
+            new CultureInfo("en"),
+            new CultureInfo("ru-RU")
+        ];
+        _selectedLanguage = AvailableLanguages.First(l =>
             l.Name == Thread.CurrentThread.CurrentUICulture.Name);
     }
 }
