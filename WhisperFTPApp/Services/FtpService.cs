@@ -11,7 +11,8 @@ internal sealed class FtpService : IFtpService
 {
     private FtpWebRequest? _currentRequest;
     private const int MaxRetries = 3;
-    private const int BaseDelay = 1000;
+    private const int BaseDelay = 2000;
+    private const int ConnectionTimeout = 15000;
 
     public async Task<bool> ConnectAsync(FtpConfiguration configuration, CancellationToken cancellationToken = default)
     {
@@ -26,18 +27,18 @@ internal sealed class FtpService : IFtpService
                 StaticFileLogger.LogInformation($"Connection attempt {attempt} of {MaxRetries}");
 
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                cts.CancelAfter(configuration.Timeout);
-
-                var connected = await SendRequestAsync(configuration, cts.Token).ConfigureAwait(false);
+                cts.CancelAfter(ConnectionTimeout);
+                var connected = await SendRequestAsync(configuration).ConfigureAwait(false);
                 if (connected)
                 {
+                    StaticFileLogger.LogInformation("Connection successful");
                     return true;
                 }
 
                 StaticFileLogger.LogError($"Connection attempt {attempt} failed");
                 if (attempt < MaxRetries)
                 {
-                    int delay = BaseDelay * (int)Math.Pow(2, attempt - 1);
+                    int delay = BaseDelay * attempt;
                     StaticFileLogger.LogInformation($"Waiting {delay}ms before retry");
                     await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                 }
@@ -50,13 +51,33 @@ internal sealed class FtpService : IFtpService
             catch (WebException ex)
             {
                 StaticFileLogger.LogError($"Connection attempt {attempt} failed: {ex.Message}");
-                if (attempt >= MaxRetries)
+                StaticFileLogger.LogError($"Status: {ex.Status}");
+
+                if (IsAuthenticationError(ex))
                 {
-                    return IsAuthenticationError(ex);
+                    StaticFileLogger.LogError("Authentication failed - stopping retries");
+                    return false;
                 }
 
-                int delay = BaseDelay * (int)Math.Pow(2, attempt - 1);
+                if (attempt >= MaxRetries)
+                {
+                    StaticFileLogger.LogError("Max retries reached");
+                    return false;
+                }
+
+                int delay = BaseDelay * attempt;
+                StaticFileLogger.LogInformation($"Waiting {delay}ms before retry");
                 await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                StaticFileLogger.LogError($"Unexpected error during connection: {ex.Message}");
+                if (attempt >= MaxRetries)
+                {
+                    return false;
+                }
+
+                await Task.Delay(BaseDelay * attempt, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -64,9 +85,8 @@ internal sealed class FtpService : IFtpService
         return false;
     }
 
-#pragma warning disable SYSLIB0014 // WebRequest is obsolete but required for FTP
-    private static async Task<bool> SendRequestAsync(FtpConfiguration configuration,
-        CancellationToken cancellationToken)
+#pragma warning disable SYSLIB0014
+    private static async Task<bool> SendRequestAsync(FtpConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -78,18 +98,37 @@ internal sealed class FtpService : IFtpService
         var request = (FtpWebRequest)WebRequest.Create(uriBuilder.Uri);
         request.Method = WebRequestMethods.Ftp.ListDirectory;
         request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
-        request.Timeout = configuration.Timeout;
+        request.Timeout = ConnectionTimeout;
+        request.ReadWriteTimeout = ConnectionTimeout;
         request.KeepAlive = false;
+        request.UsePassive = true;
+        request.UseBinary = true;
 
-        using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
-        return response.StatusCode == FtpStatusCode.OpeningData ||
-               response.StatusCode == FtpStatusCode.AccountNeeded;
+        try
+        {
+            using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
+            StaticFileLogger.LogInformation($"FTP Response: {response.StatusCode} - {response.StatusDescription}");
+
+            return response.StatusCode == FtpStatusCode.OpeningData ||
+                   response.StatusCode == FtpStatusCode.DataAlreadyOpen ||
+                   response.StatusCode == FtpStatusCode.CommandOK;
+        }
+        catch (WebException ex)
+        {
+            if (ex.Response is FtpWebResponse ftpResponse)
+            {
+                StaticFileLogger.LogError($"FTP Error: {ftpResponse.StatusCode} - {ftpResponse.StatusDescription}");
+            }
+
+            throw;
+        }
     }
 
     public Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
         _currentRequest?.Abort();
         _currentRequest = null;
+        StaticFileLogger.LogInformation("Disconnected from FTP server");
         return Task.CompletedTask;
     }
 
@@ -98,10 +137,11 @@ internal sealed class FtpService : IFtpService
         ArgumentNullException.ThrowIfNull(exception);
 
         if (exception.Status == WebExceptionStatus.ProtocolError &&
-            exception.Response is FtpWebResponse response &&
-            response.StatusCode == FtpStatusCode.NotLoggedIn)
+            exception.Response is FtpWebResponse response)
         {
-            return true;
+            return response.StatusCode == FtpStatusCode.NotLoggedIn ||
+                   response.StatusCode == FtpStatusCode.AccountNeeded ||
+                   response.StatusCode == FtpStatusCode.NeedLoginAccount;
         }
 
         return false;
@@ -124,6 +164,10 @@ internal sealed class FtpService : IFtpService
             var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.ListDirectoryDetails;
             request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+            request.Timeout = ConnectionTimeout;
+            request.ReadWriteTimeout = ConnectionTimeout;
+            request.KeepAlive = false;
+            request.UsePassive = true;
 
             using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
             using var stream = response.GetResponseStream();
@@ -168,24 +212,44 @@ internal sealed class FtpService : IFtpService
             var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.UploadFile;
             request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+            request.Timeout = ConnectionTimeout;
+            request.ReadWriteTimeout = ConnectionTimeout;
+            request.KeepAlive = true;
+            request.UsePassive = true;
+            request.UseBinary = true;
 
-            var fileStream = File.OpenRead(localPath);
+            var fileStream = new FileStream(
+                localPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 262144,
+                useAsync: true);
+
             await using (fileStream.ConfigureAwait(false))
             {
                 var ftpStream = await request.GetRequestStreamAsync().ConfigureAwait(false);
                 await using (ftpStream.ConfigureAwait(false))
                 {
-                    var buffer = new byte[8192];
+                    var buffer = new byte[131072];
                     long totalBytes = fileStream.Length;
                     long bytesRead = 0;
                     int count;
+                    int progressUpdateCounter = 0;
 
                     while ((count = await fileStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
                     {
                         await ftpStream.WriteAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
                         bytesRead += count;
-                        progress?.Report((double)bytesRead / totalBytes * 100);
+
+                        if (++progressUpdateCounter >= 10)
+                        {
+                            progress?.Report((double)bytesRead / totalBytes * 100);
+                            progressUpdateCounter = 0;
+                        }
                     }
+
+                    progress?.Report(100);
                 }
             }
 
@@ -217,23 +281,44 @@ internal sealed class FtpService : IFtpService
             var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.DownloadFile;
             request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+            request.Timeout = ConnectionTimeout;
+            request.ReadWriteTimeout = ConnectionTimeout;
+            request.KeepAlive = true;
+            request.UsePassive = true;
+            request.UseBinary = true;
 
             using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
             using var ftpStream = response.GetResponseStream();
-            var fileStream = File.Create(localPath);
+
+            var fileStream = new FileStream(
+                localPath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 262144,
+                useAsync: true);
+
             await using (fileStream.ConfigureAwait(false))
             {
-                var buffer = new byte[8192];
+                var buffer = new byte[131072];
                 long totalBytes = response.ContentLength;
                 long bytesRead = 0;
                 int count;
+                int progressUpdateCounter = 0;
 
                 while ((count = await ftpStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
                 {
                     await fileStream.WriteAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
                     bytesRead += count;
-                    progress?.Report((double)bytesRead / totalBytes * 100);
+
+                    if (++progressUpdateCounter >= 10)
+                    {
+                        progress?.Report((double)bytesRead / totalBytes * 100);
+                        progressUpdateCounter = 0;
+                    }
                 }
+
+                progress?.Report(100);
             }
 
             StaticFileLogger.LogInformation($"Download completed: {localPath}");
@@ -261,13 +346,26 @@ internal sealed class FtpService : IFtpService
             var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.DeleteFile;
             request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+            request.Timeout = ConnectionTimeout;
+            request.ReadWriteTimeout = ConnectionTimeout;
+            request.KeepAlive = false;
+            request.UsePassive = true;
 
             using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
-            StaticFileLogger.LogInformation($"File deleted: {remotePath}");
+            StaticFileLogger.LogInformation($"File deleted successfully: {remotePath} - {response.StatusDescription}");
         }
         catch (WebException ex)
         {
-            StaticFileLogger.LogError($"Delete failed {remotePath}: {ex.Message}");
+            if (ex.Response is FtpWebResponse ftpResponse)
+            {
+                StaticFileLogger.LogError(
+                    $"Delete file failed {remotePath}: {ftpResponse.StatusCode} - {ftpResponse.StatusDescription}");
+            }
+            else
+            {
+                StaticFileLogger.LogError($"Delete file failed {remotePath}: {ex.Message}");
+            }
+
             throw;
         }
     }
@@ -280,26 +378,53 @@ internal sealed class FtpService : IFtpService
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(path);
 
-        var items = await ListDirectoryAsync(configuration, path, cancellationToken).ConfigureAwait(false);
+        StaticFileLogger.LogInformation($"Starting recursive delete of directory: {path}");
 
-        foreach (var item in items)
+        try
         {
-            if (item.IsDirectory)
+            var items = await ListDirectoryAsync(configuration, path, cancellationToken).ConfigureAwait(false);
+
+            foreach (var item in items)
             {
-                await DeleteDirectoryAsync(configuration, item.FullPath, cancellationToken).ConfigureAwait(false);
+                if (item.Name == "." || item.Name == "..")
+                    continue;
+
+                if (item.IsDirectory)
+                {
+                    await DeleteDirectoryAsync(configuration, item.FullPath, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    await DeleteFileAsync(configuration, item.FullPath, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{path.TrimStart('/')}");
+            var request = (FtpWebRequest)WebRequest.Create(uri);
+            request.Method = WebRequestMethods.Ftp.RemoveDirectory;
+            request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+            request.Timeout = ConnectionTimeout;
+            request.ReadWriteTimeout = ConnectionTimeout;
+            request.KeepAlive = false;
+            request.UsePassive = true;
+
+            using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
+            StaticFileLogger.LogInformation($"Directory deleted successfully: {path} - {response.StatusDescription}");
+        }
+        catch (WebException ex)
+        {
+            if (ex.Response is FtpWebResponse ftpResponse)
+            {
+                StaticFileLogger.LogError(
+                    $"Delete directory failed {path}: {ftpResponse.StatusCode} - {ftpResponse.StatusDescription}");
             }
             else
             {
-                await DeleteFileAsync(configuration, item.FullPath, cancellationToken).ConfigureAwait(false);
+                StaticFileLogger.LogError($"Delete directory failed {path}: {ex.Message}");
             }
+
+            throw;
         }
-
-        var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{path.TrimStart('/')}");
-        var request = (FtpWebRequest)WebRequest.Create(uri);
-        request.Method = WebRequestMethods.Ftp.RemoveDirectory;
-        request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
-
-        using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
     }
 #pragma warning restore SYSLIB0014
 
