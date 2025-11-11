@@ -5,8 +5,8 @@ namespace WhisperFTPApp.Data;
 
 public class AppDbContext : DbContext
 {
-    public DbSet<FtpConnectionEntity> FtpConnections { get; set; }
-    public DbSet<SettingsEntity> Settings { get; set; }
+    public DbSet<FtpConnectionEntity> FtpConnections { get; set; } = null!;
+    public DbSet<SettingsEntity> Settings { get; set; } = null!;
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
