@@ -632,7 +632,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         }
     }
 
-#pragma warning disable SYSLIB0014 // WebRequest is obsolete but required for FTP
+#pragma warning disable SYSLIB0014
     private async Task UploadDirectoryAsync(
         FtpConfiguration config,
         FileSystemItem directory,
@@ -652,28 +652,70 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
                 targetPath,
                 CancellationToken.None).ConfigureAwait(true);
         }
-        catch (WebException)
+        catch (WebException ex) when (ex.Response is FtpWebResponse ftpResponse)
         {
-            // Directory might already exist, continue
+            if (ftpResponse.StatusCode != FtpStatusCode.ActionNotTakenFileUnavailable)
+            {
+                StaticFileLogger.LogWarning($"Directory creation issue: {ftpResponse.StatusCode} - continuing anyway");
+            }
         }
 
         var files = Directory.GetFiles(directory.FullPath);
         var dirs = Directory.GetDirectories(directory.FullPath);
         var totalItems = files.Length + dirs.Length;
         var currentItem = 0;
+        var skippedFiles = new List<string>();
+        var successCount = 0;
 
         foreach (var file in files)
         {
-            var fileName = Path.GetFileName(file);
-            var remoteFilePath = Path.Combine(targetPath, fileName).Replace('\\', '/');
-            StatusMessage = $"Uploading {fileName}...";
+            try
+            {
+                var fileName = Path.GetFileName(file);
+                var remoteFilePath = Path.Combine(targetPath, fileName).Replace('\\', '/');
+                StatusMessage = $"Uploading {fileName}...";
 
-            await _ftpService.UploadFileAsync(
-                config,
-                file,
-                remoteFilePath,
-                progress,
-                CancellationToken.None).ConfigureAwait(true);
+                await _ftpService.UploadFileAsync(
+                    config,
+                    file,
+                    remoteFilePath,
+                    progress,
+                    CancellationToken.None).ConfigureAwait(true);
+
+                successCount++;
+                StaticFileLogger.LogInformation($"Successfully uploaded: {fileName}");
+            }
+            catch (WebException ex) when (ex.Response is FtpWebResponse ftpResponse)
+            {
+                var fileName = Path.GetFileName(file);
+
+                if (ftpResponse.StatusCode == FtpStatusCode.ActionNotTakenFileUnavailable ||
+                    ftpResponse.StatusCode == FtpStatusCode.ActionNotTakenFilenameNotAllowed)
+                {
+                    var errorMessage =
+                        $"Access denied for '{fileName}': {ftpResponse.StatusCode} - {ftpResponse.StatusDescription}";
+                    StaticFileLogger.LogWarning(errorMessage);
+                    StatusMessage = $"Cannot upload '{fileName}': Access denied";
+                    skippedFiles.Add(fileName);
+                    await Task.Delay(1500).ConfigureAwait(true);
+                }
+                else
+                {
+                    StaticFileLogger.LogError(
+                        $"FTP error uploading {fileName}: {ftpResponse.StatusCode} - {ftpResponse.StatusDescription}");
+                    skippedFiles.Add(fileName);
+                    StatusMessage = $"Error uploading {fileName}: {ftpResponse.StatusDescription}";
+                    await Task.Delay(1500).ConfigureAwait(true);
+                }
+            }
+            catch (Exception ex)
+            {
+                var fileName = Path.GetFileName(file);
+                StaticFileLogger.LogError($"Unexpected error uploading {fileName}: {ex.GetType().Name} - {ex.Message}");
+                skippedFiles.Add(fileName);
+                StatusMessage = $"Error uploading {fileName}: {ex.Message}";
+                await Task.Delay(1500).ConfigureAwait(true);
+            }
 
             currentItem++;
             progress.Report((double)currentItem / totalItems * 100);
@@ -681,15 +723,38 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
         foreach (var dir in dirs)
         {
-            var subDir = new FileSystemItem
+            try
             {
-                Name = Path.GetFileName(dir),
-                FullPath = dir,
-                IsDirectory = true
-            };
-            await UploadDirectoryAsync(config, subDir, targetPath, progress).ConfigureAwait(true);
-            currentItem++;
-            progress.Report((double)currentItem / totalItems * 100);
+                var subDir = new FileSystemItem
+                {
+                    Name = Path.GetFileName(dir),
+                    FullPath = dir,
+                    IsDirectory = true
+                };
+                await UploadDirectoryAsync(config, subDir, targetPath, progress).ConfigureAwait(true);
+                successCount++;
+                currentItem++;
+                progress.Report((double)currentItem / totalItems * 100);
+            }
+            catch (Exception ex)
+            {
+                var dirName = Path.GetFileName(dir);
+                StaticFileLogger.LogError($"Error uploading directory {dirName}: {ex.Message}");
+                skippedFiles.Add($"{dirName}/");
+                currentItem++;
+                progress.Report((double)currentItem / totalItems * 100);
+            }
+        }
+
+        if (skippedFiles.Count > 0)
+        {
+            var skippedList = skippedFiles.Count > 5
+                ? string.Join(", ", skippedFiles.Take(5)) + "..."
+                : string.Join(", ", skippedFiles);
+
+            var summary = $"Uploaded {successCount}/{totalItems} items. Skipped {skippedFiles.Count}: {skippedList}";
+            StaticFileLogger.LogWarning(summary);
+            StatusMessage = summary;
         }
     }
 #pragma warning restore SYSLIB0014
@@ -818,27 +883,93 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
         var totalItems = items.Count();
         var currentItem = 0;
+        var skippedFiles = new List<string>();
+        var successCount = 0;
 
         foreach (var item in items)
         {
-            if (item.IsDirectory)
+            try
             {
-                await DownloadDirectoryAsync(config, item, targetPath, progress).ConfigureAwait(true);
+                if (item.IsDirectory)
+                {
+                    await DownloadDirectoryAsync(config, item, targetPath, progress).ConfigureAwait(true);
+                    successCount++;
+                }
+                else
+                {
+                    var itemPath = Path.Combine(targetPath, item.Name);
+                    StatusMessage = $"Downloading {item.Name}...";
+
+                    await _ftpService.DownloadFileAsync(
+                        config,
+                        item.FullPath,
+                        itemPath,
+                        progress,
+                        CancellationToken.None).ConfigureAwait(true);
+
+                    successCount++;
+                    StaticFileLogger.LogInformation($"Successfully downloaded: {item.Name}");
+                }
             }
-            else
+            catch (WebException ex) when (ex.Response is FtpWebResponse ftpResponse)
             {
-                var itemPath = Path.Combine(targetPath, item.Name);
-                StatusMessage = $"Downloading {item.Name}...";
-                await _ftpService.DownloadFileAsync(
-                    config,
-                    item.FullPath,
-                    itemPath,
-                    progress,
-                    CancellationToken.None).ConfigureAwait(true);
+                if (ftpResponse.StatusCode == FtpStatusCode.ActionNotTakenFileUnavailable ||
+                    ftpResponse.StatusCode == FtpStatusCode.ActionNotTakenFileUnavailableOrBusy ||
+                    ftpResponse.StatusCode == FtpStatusCode.ActionNotTakenFilenameNotAllowed)
+                {
+                    var errorMessage =
+                        $"Access denied for '{item.Name}': {ftpResponse.StatusCode} - {ftpResponse.StatusDescription}";
+                    StaticFileLogger.LogWarning(errorMessage);
+                    StatusMessage = $"Cannot download '{item.Name}': Access denied or file not available";
+                    skippedFiles.Add(item.Name);
+                    await Task.Delay(1500).ConfigureAwait(true);
+                }
+                else
+                {
+                    StaticFileLogger.LogError(
+                        $"FTP error downloading {item.Name}: {ftpResponse.StatusCode} - {ftpResponse.StatusDescription}");
+                    skippedFiles.Add(item.Name);
+                    StatusMessage = $"Error downloading {item.Name}: {ftpResponse.StatusDescription}";
+                    await Task.Delay(1500).ConfigureAwait(true);
+                }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                var errorMessage = $"Cannot download '{item.Name}': Local permission denied";
+                StaticFileLogger.LogWarning($"{errorMessage} - {ex.Message}");
+                StatusMessage = errorMessage;
+                skippedFiles.Add(item.Name);
+                await Task.Delay(1500).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                StaticFileLogger.LogError(
+                    $"Unexpected error downloading {item.Name}: {ex.GetType().Name} - {ex.Message}");
+                skippedFiles.Add(item.Name);
+                StatusMessage = $"Error downloading {item.Name}: {ex.Message}";
+                await Task.Delay(1500).ConfigureAwait(true);
             }
 
             currentItem++;
             progress.Report((double)currentItem / totalItems * 100);
+        }
+
+        if (skippedFiles.Count > 0)
+        {
+            var skippedList = skippedFiles.Count > 5
+                ? string.Join(", ", skippedFiles.Take(5)) + "..."
+                : string.Join(", ", skippedFiles);
+
+            var summary =
+                $"Downloaded {successCount}/{totalItems} items. Skipped {skippedFiles.Count} file(s): {skippedList}";
+            StaticFileLogger.LogWarning(summary);
+            StatusMessage = summary;
+        }
+        else
+        {
+            var successMessage = $"Successfully downloaded all {successCount} items from {directory.Name}";
+            StaticFileLogger.LogInformation(successMessage);
+            StatusMessage = successMessage;
         }
     }
 
@@ -872,6 +1003,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             var configuration = CreateConfiguration();
             int successCount = 0;
             int failCount = 0;
+            var failedItems = new List<string>();
 
             StatusMessage = $"Deleting {itemsToDelete.Count} item(s)...";
             StaticFileLogger.LogInformation($"Attempting to delete {itemsToDelete.Count} items");
@@ -900,9 +1032,32 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
                     successCount++;
                     StaticFileLogger.LogInformation($"Successfully deleted: {item.Name}");
                 }
+                catch (WebException ex) when (ex.Response is FtpWebResponse ftpResponse)
+                {
+                    if (ftpResponse.StatusCode == FtpStatusCode.ActionNotTakenFileUnavailable ||
+                        ftpResponse.StatusCode == FtpStatusCode.ActionNotTakenFilenameNotAllowed)
+                    {
+                        var errorMessage =
+                            $"Access denied for '{item.Name}': {ftpResponse.StatusCode} - {ftpResponse.StatusDescription}";
+                        StaticFileLogger.LogWarning(errorMessage);
+                        StatusMessage = $"Cannot delete '{item.Name}': Access denied";
+                        failedItems.Add(item.Name);
+                        failCount++;
+                        await Task.Delay(1500).ConfigureAwait(true);
+                    }
+                    else
+                    {
+                        StaticFileLogger.LogError(
+                            $"FTP error deleting {item.Name}: {ftpResponse.StatusCode} - {ftpResponse.StatusDescription}");
+                        failedItems.Add(item.Name);
+                        failCount++;
+                        await Task.Delay(1000).ConfigureAwait(true);
+                    }
+                }
                 catch (Exception ex)
                 {
-                    StaticFileLogger.LogError($"Failed to delete {item.Name}: {ex.Message}");
+                    StaticFileLogger.LogError($"Failed to delete {item.Name}: {ex.GetType().Name} - {ex.Message}");
+                    failedItems.Add(item.Name);
                     failCount++;
                 }
             }
@@ -913,16 +1068,28 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
             if (itemsToDelete.Count > 1)
             {
-                StatusMessage = $"Delete complete: {successCount} succeeded, {failCount} failed";
+                if (failedItems.Count > 0)
+                {
+                    var failedList = failedItems.Count > 3
+                        ? string.Join(", ", failedItems.Take(3)) + "..."
+                        : string.Join(", ", failedItems);
+                    StatusMessage = $"Delete complete: {successCount} succeeded, {failCount} failed ({failedList})";
+                }
+                else
+                {
+                    StatusMessage = $"Delete complete: {successCount} succeeded";
+                }
             }
             else
             {
-                StatusMessage = successCount > 0 ? $"Successfully deleted {itemsToDelete[0].Name}" : "Delete failed";
+                StatusMessage = successCount > 0
+                    ? $"Successfully deleted {itemsToDelete[0].Name}"
+                    : $"Failed to delete {itemsToDelete[0].Name}";
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Delete failed: {ex.Message}";
+            StatusMessage = $"Delete operation failed: {ex.Message}";
             StaticFileLogger.LogError($"Delete operation failed: {ex.Message}");
         }
         finally
