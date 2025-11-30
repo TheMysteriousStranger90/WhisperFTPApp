@@ -15,12 +15,18 @@ internal static class PathManager
 
     public static string AppDataDirectory => _appDataDirectory.Value;
 
-    public static string GetDatabasePath() =>
-        Path.Combine(AppDataDirectory, "DatabaseAzioWhisperFTP.db");
+    public static string GetDatabasePath()
+    {
+        var dataDirectory = Path.Combine(AppDataDirectory, "Data");
+        Directory.CreateDirectory(dataDirectory);
+        return Path.Combine(dataDirectory, "DatabaseAzioWhisperFTP.db");
+    }
 
     public static string GetLogFilePath()
     {
-        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-        return Path.Combine(AppDataDirectory, $"aziowhisperFTP_{timestamp}.log");
+        var logsDirectory = Path.Combine(AppDataDirectory, "Logs");
+        Directory.CreateDirectory(logsDirectory);
+        var timestamp = DateTime.Now.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+        return Path.Combine(logsDirectory, $"aziowhisperFTP_{timestamp}.log");
     }
 }
