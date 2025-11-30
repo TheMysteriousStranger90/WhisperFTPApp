@@ -1,6 +1,6 @@
 ﻿<!--
     Author: Bohdan Harabadzhyu
-    Description: WhisperFTPApp is FTP app designed for seamless file management and transfer operations.
+    Description: AzioWhisper FTP is designed for seamless file management and transfer operations.
 -->
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
@@ -127,7 +127,7 @@
         <!-- Networking -->
         <PackageReference Include="managedwifi" />
 
-        <!-- Code Analysis (опционально) -->
+        <!-- Code Analysis -->
         <PackageReference Include="SonarAnalyzer.CSharp">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
