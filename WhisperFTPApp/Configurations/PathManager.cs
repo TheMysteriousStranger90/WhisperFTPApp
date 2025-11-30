@@ -8,7 +8,7 @@ internal static class PathManager
     {
         var appDataPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "AzioWhisper FTP");
+            "AzioWhisperFTP");
         Directory.CreateDirectory(appDataPath);
         return appDataPath;
     });

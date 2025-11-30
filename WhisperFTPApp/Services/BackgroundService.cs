@@ -17,7 +17,7 @@ public class BackgroundService : IBackgroundService, IDisposable
     {
         _settingsService = settingsService;
         _backgroundChanged =
-            new BehaviorSubject<string>("avares://WhisperFTPApp/Assets/Image (3).jpg"); // Use full Avalonia URI
+            new BehaviorSubject<string>("avares://AzioWhisperFTP/Assets/Image (3).jpg");
         _ = LoadInitialBackground();
     }
 
@@ -28,7 +28,7 @@ public class BackgroundService : IBackgroundService, IDisposable
             var background = await _settingsService.LoadBackgroundSettingAsync().ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(background) && !background.StartsWith("avares://", StringComparison.Ordinal))
             {
-                background = $"avares://WhisperFTPApp{background}";
+                background = $"avares://AzioWhisperFTP{background}";
             }
 
             _backgroundChanged.OnNext(background);
@@ -50,7 +50,7 @@ public class BackgroundService : IBackgroundService, IDisposable
         {
             var dbPath = path.StartsWith("avares://", StringComparison.Ordinal)
                 ? path
-                : $"avares://WhisperFTPApp{path}";
+                : $"avares://AzioWhisperFTP{path}";
             StaticFileLogger.LogInformation($"[BackgroundService] Changing background to: {dbPath}");
             await _settingsService.SaveBackgroundSettingAsync(dbPath).ConfigureAwait(false);
             _backgroundChanged.OnNext(dbPath);

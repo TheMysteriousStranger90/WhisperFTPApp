@@ -9,7 +9,7 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/icon.ico"
         Opacity="0.9"
-        Title="WhisperFTP">
+        Title="AzioWhisper FTP">
 
     <Window.Background>
         <Binding Path="BackgroundPath" Converter="{x:Static global:WindowBackgroundConverter.Instance}" />

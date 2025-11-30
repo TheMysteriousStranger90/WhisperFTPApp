@@ -21,16 +21,20 @@
 
         <NeutralLanguage>en</NeutralLanguage>
 
+        <!-- Assembly Naming -->
+        <AssemblyName>AzioWhisperFTP</AssemblyName>
+        <RootNamespace>WhisperFTPApp</RootNamespace>
+
         <!-- Version Info -->
-        <AssemblyVersion>1.1.0.0</AssemblyVersion>
-        <FileVersion>1.1.0.0</FileVersion>
-        <InformationalVersion>1.1.0</InformationalVersion>
+        <AssemblyVersion>1.2.0.0</AssemblyVersion>
+        <FileVersion>1.2.0.0</FileVersion>
+        <InformationalVersion>1.2.0</InformationalVersion>
 
         <!-- Product Info -->
         <Authors>Bohdan Harabadzhyu</Authors>
         <Company>Bohdan Harabadzhyu</Company>
-        <Product>WhisperFTPApp</Product>
-        <Description>WhisperFTPApp is FTP app designed for seamless file management and transfer operations.</Description>
+        <Product>AzioWhisper FTP</Product>
+        <Description>AzioWhisper FTP is designed for seamless file management and transfer operations.</Description>
         <Copyright>Copyright © 2024 Bohdan Harabadzhyu</Copyright>
 
         <!-- Repository Info -->

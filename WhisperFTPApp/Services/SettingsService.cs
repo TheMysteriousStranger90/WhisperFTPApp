@@ -130,9 +130,9 @@ internal sealed class SettingsService : ISettingsService
         if (string.IsNullOrWhiteSpace(path))
             return "/Assets/Image (3).jpg";
 
-        if (path.StartsWith("avares://WhisperFTPApp", StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWith("avares://AzioWhisperFTP", StringComparison.OrdinalIgnoreCase))
         {
-            return path.Replace("avares://WhisperFTPApp", "", StringComparison.OrdinalIgnoreCase);
+            return path.Replace("avares:/AzioWhisperFTP", "", StringComparison.OrdinalIgnoreCase);
         }
 
         return path.StartsWith('/') ? path : $"/{path}";
@@ -141,7 +141,7 @@ internal sealed class SettingsService : ISettingsService
     private static string ConvertToAvaresPath(string dbPath)
     {
         if (string.IsNullOrWhiteSpace(dbPath))
-            return "avares://WhisperFTPApp/Assets/Image (3).jpg";
+            return "avares://AzioWhisperFTP/Assets/Image (3).jpg";
 
         if (dbPath.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))
         {
@@ -150,6 +150,6 @@ internal sealed class SettingsService : ISettingsService
 
         var relativePath = dbPath.TrimStart('/');
 
-        return $"avares://WhisperFTPApp/{relativePath}";
+        return $"avares://AzioWhisperFTP/{relativePath}";
     }
 }
