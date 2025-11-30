@@ -304,7 +304,7 @@ internal sealed class FtpService : IFtpService
         try
         {
             var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
-            var request = CreateRequest(uri, configuration);
+            var request = CreateRequestForLargeFile(uri, configuration);
             request.Method = WebRequestMethods.Ftp.UploadFile;
 
             var fileStream = new FileStream(
@@ -325,16 +325,29 @@ internal sealed class FtpService : IFtpService
                     long bytesRead = 0;
                     int count;
                     int progressUpdateCounter = 0;
+                    var lastProgressTime = DateTime.UtcNow;
+
+                    StaticFileLogger.LogInformation(
+                        $"File size: {totalBytes} bytes ({totalBytes / 1024.0 / 1024.0:F2} MB)");
 
                     while ((count = await fileStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
                     {
                         await ftpStream.WriteAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
                         bytesRead += count;
 
-                        if (++progressUpdateCounter >= 10)
+                        if (++progressUpdateCounter >= 10 ||
+                            (DateTime.UtcNow - lastProgressTime).TotalMilliseconds > 500)
                         {
-                            progress?.Report((double)bytesRead / totalBytes * 100);
+                            var percentage = (double)bytesRead / totalBytes * 100;
+                            progress?.Report(percentage);
                             progressUpdateCounter = 0;
+                            lastProgressTime = DateTime.UtcNow;
+
+                            if (totalBytes > 10 * 1024 * 1024)
+                            {
+                                StaticFileLogger.LogInformation(
+                                    $"Upload progress: {bytesRead / 1024.0 / 1024.0:F2}/{totalBytes / 1024.0 / 1024.0:F2} MB ({percentage:F1}%)");
+                            }
                         }
                     }
 
@@ -347,6 +360,12 @@ internal sealed class FtpService : IFtpService
         catch (WebException ex)
         {
             StaticFileLogger.LogError($"Upload failed {remotePath}: {ex.Message}");
+            StaticFileLogger.LogError($"Status: {ex.Status}");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Upload failed with unexpected error: {ex.Message}");
             throw;
         }
     }
@@ -458,7 +477,7 @@ internal sealed class FtpService : IFtpService
         try
         {
             var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
-            var request = CreateRequest(uri, configuration);
+            var request = CreateRequestForLargeFile(uri, configuration);
             request.Method = WebRequestMethods.Ftp.DownloadFile;
 
             using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
@@ -479,16 +498,28 @@ internal sealed class FtpService : IFtpService
                 long bytesRead = 0;
                 int count;
                 int progressUpdateCounter = 0;
+                var lastProgressTime = DateTime.UtcNow;
+
+                StaticFileLogger.LogInformation(
+                    $"File size: {totalBytes} bytes ({totalBytes / 1024.0 / 1024.0:F2} MB)");
 
                 while ((count = await ftpStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
                 {
                     await fileStream.WriteAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
                     bytesRead += count;
 
-                    if (++progressUpdateCounter >= 10)
+                    if (++progressUpdateCounter >= 10 || (DateTime.UtcNow - lastProgressTime).TotalMilliseconds > 500)
                     {
-                        progress?.Report((double)bytesRead / totalBytes * 100);
+                        var percentage = (double)bytesRead / totalBytes * 100;
+                        progress?.Report(percentage);
                         progressUpdateCounter = 0;
+                        lastProgressTime = DateTime.UtcNow;
+
+                        if (totalBytes > 10 * 1024 * 1024)
+                        {
+                            StaticFileLogger.LogInformation(
+                                $"Download progress: {bytesRead / 1024.0 / 1024.0:F2}/{totalBytes / 1024.0 / 1024.0:F2} MB ({percentage:F1}%)");
+                        }
                     }
                 }
 
@@ -500,6 +531,39 @@ internal sealed class FtpService : IFtpService
         catch (WebException ex)
         {
             StaticFileLogger.LogError($"Download failed {remotePath}: {ex.Message}");
+            StaticFileLogger.LogError($"Status: {ex.Status}");
+
+            if (File.Exists(localPath))
+            {
+                try
+                {
+                    File.Delete(localPath);
+                    StaticFileLogger.LogInformation($"Deleted incomplete file: {localPath}");
+                }
+                catch (Exception deleteEx)
+                {
+                    StaticFileLogger.LogError($"Failed to delete incomplete file: {deleteEx.Message}");
+                }
+            }
+
+            throw;
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Download failed with unexpected error: {ex.Message}");
+
+            if (File.Exists(localPath))
+            {
+                try
+                {
+                    File.Delete(localPath);
+                }
+                catch
+                {
+                    // Ignored
+                }
+            }
+
             throw;
         }
     }
@@ -732,15 +796,18 @@ internal sealed class FtpService : IFtpService
 #pragma warning disable SYSLIB0014
         var request = (FtpWebRequest)WebRequest.Create(uri);
         request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
-        request.Timeout = ConnectionTimeout;
-        request.ReadWriteTimeout = ConnectionTimeout;
+        request.Timeout = configuration.Timeout > 0 ? configuration.Timeout : ConnectionTimeout;
+        request.ReadWriteTimeout = configuration.ReadWriteTimeout > 0
+            ? configuration.ReadWriteTimeout
+            : ConnectionTimeout;
         request.KeepAlive = true;
-        request.UsePassive = true;
+        request.UsePassive = configuration.UsePassive;
         request.UseBinary = true;
 
         _currentRequest = request;
 
         return request;
+#pragma warning restore SYSLIB0014
     }
 
     [Obsolete("Obsolete")]
@@ -880,6 +947,31 @@ internal sealed class FtpService : IFtpService
         {
             return null;
         }
+    }
+
+    private FtpWebRequest CreateRequestForLargeFile(Uri uri, FtpConfiguration configuration)
+    {
+#pragma warning disable SYSLIB0014
+        var request = (FtpWebRequest)WebRequest.Create(uri);
+        request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+
+        request.Timeout = 30000;
+
+        request.ReadWriteTimeout = configuration.ReadWriteTimeout > 0
+            ? configuration.ReadWriteTimeout
+            : 300000;
+
+        request.KeepAlive = true;
+        request.UsePassive = configuration.UsePassive;
+        request.UseBinary = true;
+
+        _currentRequest = request;
+
+        StaticFileLogger.LogInformation(
+            $"Request created - Timeout: {request.Timeout}ms, ReadWriteTimeout: {request.ReadWriteTimeout}ms");
+
+        return request;
+#pragma warning restore SYSLIB0014
     }
 
     #endregion
