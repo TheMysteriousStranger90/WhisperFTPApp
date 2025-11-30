@@ -3,6 +3,9 @@ root = true
 [*.cs]
 # Suppress non-critical analyzer warnings
 
+# S1133 : Remove dead code (false positives in some cases)
+dotnet_diagnostic.S1133.severity = suggestion
+
 # CA1515: Types should be internal (not critical for application code)
 dotnet_diagnostic.CA1515.severity = suggestion
 

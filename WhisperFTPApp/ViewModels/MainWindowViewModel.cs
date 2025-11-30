@@ -56,6 +56,55 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
     private readonly Control _settingsView;
     private readonly Control _scanView;
     private string _backgroundPath = string.Empty;
+    private int _timeout = 10000;
+    private int _readWriteTimeout = 30000;
+    private bool _enableSsl;
+    private bool _usePassive = true;
+    private int _bufferSize = 131072;
+    private int _maxRetries = 3;
+    private int _retryDelay = 2000;
+
+    public int Timeout
+    {
+        get => _timeout;
+        set => this.RaiseAndSetIfChanged(ref _timeout, value);
+    }
+
+    public int ReadWriteTimeout
+    {
+        get => _readWriteTimeout;
+        set => this.RaiseAndSetIfChanged(ref _readWriteTimeout, value);
+    }
+
+    public bool EnableSsl
+    {
+        get => _enableSsl;
+        set => this.RaiseAndSetIfChanged(ref _enableSsl, value);
+    }
+
+    public bool UsePassive
+    {
+        get => _usePassive;
+        set => this.RaiseAndSetIfChanged(ref _usePassive, value);
+    }
+
+    public int BufferSize
+    {
+        get => _bufferSize;
+        set => this.RaiseAndSetIfChanged(ref _bufferSize, value);
+    }
+
+    public int MaxRetries
+    {
+        get => _maxRetries;
+        set => this.RaiseAndSetIfChanged(ref _maxRetries, value);
+    }
+
+    public int RetryDelay
+    {
+        get => _retryDelay;
+        set => this.RaiseAndSetIfChanged(ref _retryDelay, value);
+    }
 
     private readonly ObservableCollection<FileSystemItem> _selectedLocalItems = new();
     private readonly ObservableCollection<FileSystemItem> _selectedFtpItems = new();
@@ -425,26 +474,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             _ftpItems.Clear();
             UpdateRemoteStats();
 
-            if (!int.TryParse(Port, out int portNumber))
-            {
-                StatusMessage = "Invalid port number";
-                return;
-            }
-
-            if (!FtpAddress.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase))
-            {
-                FtpAddress = $"ftp://{FtpAddress}";
-            }
-
-            var uri = new Uri(FtpAddress);
-            var baseAddress = $"{uri.Scheme}://{uri.Host}";
-
-            var configuration = new FtpConfiguration(
-                baseAddress,
-                Username,
-                Password,
-                portNumber,
-                timeout: 10000);
+            var configuration = CreateConfiguration();
 
             bool isConnected = await _ftpService.ConnectAsync(configuration).ConfigureAwait(true);
             if (isConnected)
@@ -452,7 +482,12 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
                 IsConnected = true;
                 StatusMessage = "Connected successfully";
                 StaticFileLogger.LogInformation($"Successfully connected to {FtpAddress}");
-                var items = await _ftpService.ListDirectoryAsync(configuration).ConfigureAwait(true);
+
+                var items = await _ftpService.ListDirectoryAsync(
+                    configuration,
+                    CurrentDirectory,
+                    CancellationToken.None).ConfigureAwait(true);
+
                 FtpItems = new ObservableCollection<FileSystemItem>(items);
                 UpdateRemoteStats();
 
@@ -527,12 +562,18 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
                     var remotePath = Path.Combine(targetDirectory, item.Name).Replace('\\', '/');
 
                     if (!item.IsDirectory &&
-                        await _ftpService.FileExistsAsync(configuration, remotePath).ConfigureAwait(true))
+                        await _ftpService.FileExistsAsync(configuration, remotePath, CancellationToken.None)
+                            .ConfigureAwait(true))
                     {
-                        var existingSize = await _ftpService.GetFileSizeAsync(configuration, remotePath)
-                            .ConfigureAwait(true);
-                        var existingModified = await _ftpService.GetFileModifiedTimeAsync(configuration, remotePath)
-                            .ConfigureAwait(true);
+                        var existingSize = await _ftpService.GetFileSizeAsync(
+                            configuration,
+                            remotePath,
+                            CancellationToken.None).ConfigureAwait(true);
+
+                        var existingModified = await _ftpService.GetFileModifiedTimeAsync(
+                            configuration,
+                            remotePath,
+                            CancellationToken.None).ConfigureAwait(true);
 
                         StatusMessage =
                             $"File {item.Name} already exists (Size: {existingSize} bytes, Modified: {existingModified:g}). Skipping...";
@@ -548,8 +589,12 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
                     else
                     {
                         StatusMessage = $"Uploading {item.Name} ({i + 1}/{itemsToUpload.Count})...";
-                        await _ftpService.UploadFileAsync(configuration, item.FullPath, remotePath, progress)
-                            .ConfigureAwait(true);
+                        await _ftpService.UploadFileAsync(
+                            configuration,
+                            item.FullPath,
+                            remotePath,
+                            progress,
+                            CancellationToken.None).ConfigureAwait(true);
                     }
 
                     successCount++;
@@ -588,7 +633,10 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
     }
 
 #pragma warning disable SYSLIB0014 // WebRequest is obsolete but required for FTP
-    private async Task UploadDirectoryAsync(FtpConfiguration config, FileSystemItem directory, string remotePath,
+    private async Task UploadDirectoryAsync(
+        FtpConfiguration config,
+        FileSystemItem directory,
+        string remotePath,
         IProgress<double> progress)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -597,14 +645,12 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
         var targetPath = Path.Combine(remotePath, directory.Name).Replace('\\', '/');
 
-        var uri = new Uri($"{config.FtpAddress.TrimEnd('/')}/{targetPath.TrimStart('/')}");
-        var createDirRequest = (FtpWebRequest)WebRequest.Create(uri);
-        createDirRequest.Method = WebRequestMethods.Ftp.MakeDirectory;
-        createDirRequest.Credentials = new NetworkCredential(config.Username, config.Password);
-
         try
         {
-            using var response = await createDirRequest.GetResponseAsync().ConfigureAwait(true);
+            await _ftpService.CreateDirectoryAsync(
+                config,
+                targetPath,
+                CancellationToken.None).ConfigureAwait(true);
         }
         catch (WebException)
         {
@@ -621,7 +667,14 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             var fileName = Path.GetFileName(file);
             var remoteFilePath = Path.Combine(targetPath, fileName).Replace('\\', '/');
             StatusMessage = $"Uploading {fileName}...";
-            await _ftpService.UploadFileAsync(config, file, remoteFilePath, progress).ConfigureAwait(true);
+
+            await _ftpService.UploadFileAsync(
+                config,
+                file,
+                remoteFilePath,
+                progress,
+                CancellationToken.None).ConfigureAwait(true);
+
             currentItem++;
             progress.Report((double)currentItem / totalItems * 100);
         }
@@ -684,7 +737,6 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
                 {
                     var localPath = Path.Combine(LocalCurrentPath, item.Name);
 
-                    // Проверка существования файла
                     if (!item.IsDirectory && File.Exists(localPath))
                     {
                         var localInfo = new FileInfo(localPath);
@@ -703,8 +755,12 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
                     else
                     {
                         StatusMessage = $"Downloading {item.Name} ({i + 1}/{itemsToDownload.Count})...";
-                        await _ftpService.DownloadFileAsync(configuration, item.FullPath, localPath, progress)
-                            .ConfigureAwait(true);
+                        await _ftpService.DownloadFileAsync(
+                            configuration,
+                            item.FullPath,
+                            localPath,
+                            progress,
+                            CancellationToken.None).ConfigureAwait(true);
                     }
 
                     successCount++;
@@ -742,7 +798,10 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private async Task DownloadDirectoryAsync(FtpConfiguration config, FileSystemItem directory, string localPath,
+    private async Task DownloadDirectoryAsync(
+        FtpConfiguration config,
+        FileSystemItem directory,
+        string localPath,
         IProgress<double> progress)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -752,7 +811,11 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         var targetPath = Path.Combine(localPath, directory.Name);
         Directory.CreateDirectory(targetPath);
 
-        var items = await _ftpService.ListDirectoryAsync(config, directory.FullPath).ConfigureAwait(true);
+        var items = await _ftpService.ListDirectoryAsync(
+            config,
+            directory.FullPath,
+            CancellationToken.None).ConfigureAwait(true);
+
         var totalItems = items.Count();
         var currentItem = 0;
 
@@ -766,7 +829,12 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             {
                 var itemPath = Path.Combine(targetPath, item.Name);
                 StatusMessage = $"Downloading {item.Name}...";
-                await _ftpService.DownloadFileAsync(config, item.FullPath, itemPath, progress).ConfigureAwait(true);
+                await _ftpService.DownloadFileAsync(
+                    config,
+                    item.FullPath,
+                    itemPath,
+                    progress,
+                    CancellationToken.None).ConfigureAwait(true);
             }
 
             currentItem++;
@@ -816,11 +884,17 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
                     if (item.IsDirectory)
                     {
-                        await _ftpService.DeleteDirectoryAsync(configuration, item.FullPath).ConfigureAwait(true);
+                        await _ftpService.DeleteDirectoryAsync(
+                            configuration,
+                            item.FullPath,
+                            CancellationToken.None).ConfigureAwait(true);
                     }
                     else
                     {
-                        await _ftpService.DeleteFileAsync(configuration, item.FullPath).ConfigureAwait(true);
+                        await _ftpService.DeleteFileAsync(
+                            configuration,
+                            item.FullPath,
+                            CancellationToken.None).ConfigureAwait(true);
                     }
 
                     successCount++;
@@ -863,7 +937,12 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         {
             StatusMessage = "Refreshing directory...";
             var configuration = CreateConfiguration();
-            var items = await _ftpService.ListDirectoryAsync(configuration, CurrentDirectory).ConfigureAwait(true);
+
+            var items = await _ftpService.ListDirectoryAsync(
+                configuration,
+                CurrentDirectory,
+                CancellationToken.None).ConfigureAwait(true);
+
             _ftpItems.Clear();
             foreach (var item in items)
             {
@@ -1109,15 +1188,27 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             throw new InvalidOperationException("Invalid port number");
         }
 
-        var uri = new Uri(FtpAddress);
+        var uri = new Uri(FtpAddress.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase)
+            ? FtpAddress
+            : $"ftp://{FtpAddress}");
         var baseAddress = $"{uri.Scheme}://{uri.Host}";
 
-        return new FtpConfiguration(
-            baseAddress,
-            Username,
-            Password,
-            portNumber,
-            timeout: 5000);
+        return new FtpConfiguration
+        {
+            FtpAddress = baseAddress,
+            Username = Username,
+            Password = Password,
+            Port = portNumber,
+            Timeout = Timeout,
+            ReadWriteTimeout = ReadWriteTimeout,
+            EnableSsl = EnableSsl,
+            UsePassive = UsePassive,
+            UseBinary = true,
+            KeepAlive = true,
+            BufferSize = BufferSize,
+            MaxRetries = MaxRetries,
+            RetryDelay = RetryDelay
+        };
     }
 
     private void InitializeLocalNavigation()
@@ -1141,7 +1232,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         StaticFileLogger.LogInformation("Disconnecting from FTP server");
         try
         {
-            await _ftpService.DisconnectAsync().ConfigureAwait(true);
+            await _ftpService.DisconnectAsync(CancellationToken.None).ConfigureAwait(true);
             _ftpItems.Clear();
             UpdateRemoteStats();
             IsConnected = false;

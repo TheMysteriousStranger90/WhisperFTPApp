@@ -85,9 +85,15 @@ public class DataGridSelectionBehavior : Behavior<DataGrid>
         {
             AssociatedObject.SelectedItems.Clear();
 
+            var itemsSource = AssociatedObject.ItemsSource;
+            if (itemsSource == null)
+                return;
+
+            var validItems = itemsSource.Cast<object>().ToList();
+
             foreach (var item in SelectedItems)
             {
-                if (item != null)
+                if (item != null && validItems.Contains(item))
                 {
                     AssociatedObject.SelectedItems.Add(item);
                 }
