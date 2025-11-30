@@ -935,21 +935,44 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
     {
         try
         {
+            IsTransferring = true;
             StatusMessage = "Refreshing directory...";
+            TransferProgress = 0;
+
             var configuration = CreateConfiguration();
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
             var items = await _ftpService.ListDirectoryAsync(
                 configuration,
                 CurrentDirectory,
-                CancellationToken.None).ConfigureAwait(true);
+                cts.Token).ConfigureAwait(true);
 
             _ftpItems.Clear();
-            foreach (var item in items)
+
+            var itemsList = items.ToList();
+            int batchSize = 50;
+
+            for (int i = 0; i < itemsList.Count; i += batchSize)
             {
-                _ftpItems.Add(item);
+                var batch = itemsList.Skip(i).Take(batchSize);
+                foreach (var item in batch)
+                {
+                    _ftpItems.Add(item);
+                }
+
+                TransferProgress = (double)(i + batchSize) / itemsList.Count * 100;
+
+                await Task.Delay(10, CancellationToken.None).ConfigureAwait(true);
             }
 
-            StatusMessage = "Directory refreshed";
+            StatusMessage = $"Directory refreshed ({itemsList.Count} items)";
+            UpdateRemoteStats();
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Refresh timeout - server response too slow";
+            _ftpItems.Clear();
             UpdateRemoteStats();
         }
         catch (Exception ex)
@@ -957,6 +980,11 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             StatusMessage = $"Refresh failed: {ex.Message}";
             _ftpItems.Clear();
             UpdateRemoteStats();
+        }
+        finally
+        {
+            IsTransferring = false;
+            TransferProgress = 0;
         }
     }
 
