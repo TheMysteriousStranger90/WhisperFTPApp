@@ -8,7 +8,7 @@ internal static class PathManager
     {
         var appDataPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "WhisperFTP");
+            "AzioWhisper FTP");
         Directory.CreateDirectory(appDataPath);
         return appDataPath;
     });
@@ -16,11 +16,11 @@ internal static class PathManager
     public static string AppDataDirectory => _appDataDirectory.Value;
 
     public static string GetDatabasePath() =>
-        Path.Combine(AppDataDirectory, "DatabaseWhisperFTPApp.db");
+        Path.Combine(AppDataDirectory, "DatabaseAzioWhisperFTP.db");
 
     public static string GetLogFilePath()
     {
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-        return Path.Combine(AppDataDirectory, $"whisperFTP_{timestamp}.log");
+        return Path.Combine(AppDataDirectory, $"aziowhisperFTP_{timestamp}.log");
     }
 }
