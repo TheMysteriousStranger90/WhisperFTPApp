@@ -40,6 +40,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
     private ObservableCollection<DriveInfo> _availableDrives = new();
     private DriveInfo? _selectedDrive;
     private ObservableCollection<FileSystemItem> _localItems = new();
+
     private FileSystemItem? _selectedLocalItem;
     private string _localCurrentPath = string.Empty;
     private FileStats _localFileStats = new();
@@ -55,6 +56,12 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
     private readonly Control _settingsView;
     private readonly Control _scanView;
     private string _backgroundPath = string.Empty;
+
+    private readonly ObservableCollection<FileSystemItem> _selectedLocalItems = new();
+    private readonly ObservableCollection<FileSystemItem> _selectedFtpItems = new();
+
+    public ObservableCollection<FileSystemItem> SelectedLocalItems => _selectedLocalItems;
+    public ObservableCollection<FileSystemItem> SelectedFtpItems => _selectedFtpItems;
 
     public string Port
     {
@@ -476,37 +483,97 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
     {
         IsTransferring = true;
         StaticFileLogger.LogInformation($"Starting upload operation from {LocalCurrentPath}");
+
+        List<FileSystemItem> itemsToUpload;
+
+        if (SelectedLocalItems.Count > 0)
+        {
+            itemsToUpload = SelectedLocalItems.Where(i => !i.Name.Equals("..", StringComparison.Ordinal)).ToList();
+        }
+        else if (SelectedLocalItem != null)
+        {
+            itemsToUpload = new List<FileSystemItem> { SelectedLocalItem };
+        }
+        else
+        {
+            itemsToUpload = new List<FileSystemItem>();
+        }
+
+        if (itemsToUpload.Count == 0)
+        {
+            StatusMessage = "No items selected for upload";
+            IsTransferring = false;
+            return;
+        }
+
         try
         {
-            if (SelectedLocalItem == null)
-            {
-                StatusMessage = "No item selected for upload";
-                return;
-            }
-
             var configuration = CreateConfiguration();
             var progress = new Progress<double>(p => TransferProgress = p);
+            int successCount = 0;
+            int failCount = 0;
 
-            string targetDirectory = SelectedFtpItem?.IsDirectory == true
-                ? SelectedFtpItem.FullPath
-                : CurrentDirectory;
+            StatusMessage = $"Uploading {itemsToUpload.Count} item(s)...";
 
-            if (SelectedLocalItem.IsDirectory)
+            for (int i = 0; i < itemsToUpload.Count; i++)
             {
-                await UploadDirectoryAsync(configuration, SelectedLocalItem, targetDirectory, progress)
-                    .ConfigureAwait(true);
-            }
-            else
-            {
-                var remotePath = Path.Combine(targetDirectory, SelectedLocalItem.Name).Replace('\\', '/');
-                StatusMessage = $"Uploading {SelectedLocalItem.Name}...";
-                await _ftpService.UploadFileAsync(configuration, SelectedLocalItem.FullPath, remotePath, progress)
-                    .ConfigureAwait(true);
+                var item = itemsToUpload[i];
+                try
+                {
+                    string targetDirectory = SelectedFtpItem?.IsDirectory == true
+                        ? SelectedFtpItem.FullPath
+                        : CurrentDirectory;
+
+                    var remotePath = Path.Combine(targetDirectory, item.Name).Replace('\\', '/');
+
+                    if (!item.IsDirectory &&
+                        await _ftpService.FileExistsAsync(configuration, remotePath).ConfigureAwait(true))
+                    {
+                        var existingSize = await _ftpService.GetFileSizeAsync(configuration, remotePath)
+                            .ConfigureAwait(true);
+                        var existingModified = await _ftpService.GetFileModifiedTimeAsync(configuration, remotePath)
+                            .ConfigureAwait(true);
+
+                        StatusMessage =
+                            $"File {item.Name} already exists (Size: {existingSize} bytes, Modified: {existingModified:g}). Skipping...";
+                        StaticFileLogger.LogInformation($"Skipping existing file: {item.Name}");
+                        await Task.Delay(1000).ConfigureAwait(true);
+                        continue;
+                    }
+
+                    if (item.IsDirectory)
+                    {
+                        await UploadDirectoryAsync(configuration, item, targetDirectory, progress).ConfigureAwait(true);
+                    }
+                    else
+                    {
+                        StatusMessage = $"Uploading {item.Name} ({i + 1}/{itemsToUpload.Count})...";
+                        await _ftpService.UploadFileAsync(configuration, item.FullPath, remotePath, progress)
+                            .ConfigureAwait(true);
+                    }
+
+                    successCount++;
+                    ((IProgress<double>)progress).Report((double)(i + 1) / itemsToUpload.Count * 100);
+                }
+                catch (Exception ex)
+                {
+                    StaticFileLogger.LogError($"Failed to upload {item.Name}: {ex.Message}");
+                    failCount++;
+                }
             }
 
             await RefreshDirectoryAsync().ConfigureAwait(true);
-            StatusMessage = "Upload complete";
-            StaticFileLogger.LogInformation("Upload completed");
+
+            if (itemsToUpload.Count > 1)
+            {
+                StatusMessage = $"Upload complete: {successCount} succeeded, {failCount} failed";
+            }
+            else
+            {
+                StatusMessage = successCount > 0 ? "Upload complete" : "Upload failed";
+            }
+
+            StaticFileLogger.LogInformation($"Upload completed: {successCount} succeeded, {failCount} failed");
         }
         catch (Exception ex)
         {
@@ -577,34 +644,91 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
     private async Task DownloadFileAsync()
     {
         IsTransferring = true;
-        StaticFileLogger.LogInformation($"Starting download of {SelectedFtpItem?.Name}");
+        StaticFileLogger.LogInformation($"Starting download operation");
+
+        List<FileSystemItem> itemsToDownload;
+
+        if (SelectedFtpItems.Count > 0)
+        {
+            itemsToDownload = SelectedFtpItems.ToList();
+        }
+        else if (SelectedFtpItem != null)
+        {
+            itemsToDownload = new List<FileSystemItem> { SelectedFtpItem };
+        }
+        else
+        {
+            itemsToDownload = new List<FileSystemItem>();
+        }
+
+        if (itemsToDownload.Count == 0)
+        {
+            StatusMessage = "No items selected for download";
+            IsTransferring = false;
+            return;
+        }
+
         try
         {
-            if (SelectedFtpItem == null)
-            {
-                StatusMessage = "No item selected for download";
-                return;
-            }
-
             var configuration = CreateConfiguration();
             var progress = new Progress<double>(p => TransferProgress = p);
+            int successCount = 0;
+            int failCount = 0;
 
-            if (SelectedFtpItem.IsDirectory)
+            StatusMessage = $"Downloading {itemsToDownload.Count} item(s)...";
+
+            for (int i = 0; i < itemsToDownload.Count; i++)
             {
-                await DownloadDirectoryAsync(configuration, SelectedFtpItem, LocalCurrentPath, progress)
-                    .ConfigureAwait(true);
-            }
-            else
-            {
-                var localPath = Path.Combine(LocalCurrentPath, SelectedFtpItem.Name);
-                StatusMessage = $"Downloading {SelectedFtpItem.Name}...";
-                await _ftpService.DownloadFileAsync(configuration, SelectedFtpItem.FullPath, localPath, progress)
-                    .ConfigureAwait(true);
+                var item = itemsToDownload[i];
+                try
+                {
+                    var localPath = Path.Combine(LocalCurrentPath, item.Name);
+
+                    // Проверка существования файла
+                    if (!item.IsDirectory && File.Exists(localPath))
+                    {
+                        var localInfo = new FileInfo(localPath);
+                        StatusMessage =
+                            $"File {item.Name} already exists locally (Size: {localInfo.Length} bytes, Modified: {localInfo.LastWriteTime:g}). Skipping...";
+                        StaticFileLogger.LogInformation($"Skipping existing local file: {item.Name}");
+                        await Task.Delay(1000).ConfigureAwait(true);
+                        continue;
+                    }
+
+                    if (item.IsDirectory)
+                    {
+                        await DownloadDirectoryAsync(configuration, item, LocalCurrentPath, progress)
+                            .ConfigureAwait(true);
+                    }
+                    else
+                    {
+                        StatusMessage = $"Downloading {item.Name} ({i + 1}/{itemsToDownload.Count})...";
+                        await _ftpService.DownloadFileAsync(configuration, item.FullPath, localPath, progress)
+                            .ConfigureAwait(true);
+                    }
+
+                    successCount++;
+                    ((IProgress<double>)progress).Report((double)(i + 1) / itemsToDownload.Count * 100);
+                }
+                catch (Exception ex)
+                {
+                    StaticFileLogger.LogError($"Failed to download {item.Name}: {ex.Message}");
+                    failCount++;
+                }
             }
 
             await RefreshLocalFiles().ConfigureAwait(true);
-            StatusMessage = "Download complete";
-            StaticFileLogger.LogInformation("Download completed");
+
+            if (itemsToDownload.Count > 1)
+            {
+                StatusMessage = $"Download complete: {successCount} succeeded, {failCount} failed";
+            }
+            else
+            {
+                StatusMessage = successCount > 0 ? "Download complete" : "Download failed";
+            }
+
+            StaticFileLogger.LogInformation($"Download completed: {successCount} succeeded, {failCount} failed");
         }
         catch (Exception ex)
         {
@@ -652,41 +776,80 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
     private async Task DeleteFileAsync()
     {
-        if (SelectedFtpItem == null)
+        List<FileSystemItem> itemsToDelete;
+
+        if (SelectedFtpItems.Count > 0)
         {
-            StatusMessage = "No item selected for deletion";
+            itemsToDelete = SelectedFtpItems.ToList();
+        }
+        else if (SelectedFtpItem != null)
+        {
+            itemsToDelete = new List<FileSystemItem> { SelectedFtpItem };
+        }
+        else
+        {
+            itemsToDelete = new List<FileSystemItem>();
+        }
+
+        if (itemsToDelete.Count == 0)
+        {
+            StatusMessage = "No items selected for deletion";
             return;
         }
 
         IsTransferring = true;
-        var itemToDelete = SelectedFtpItem;
-        var itemName = itemToDelete.Name;
 
-        StaticFileLogger.LogInformation($"Attempting to delete {itemName}");
         try
         {
-            StatusMessage = $"Deleting {itemName}...";
             var configuration = CreateConfiguration();
+            int successCount = 0;
+            int failCount = 0;
 
-            if (itemToDelete.IsDirectory)
+            StatusMessage = $"Deleting {itemsToDelete.Count} item(s)...";
+            StaticFileLogger.LogInformation($"Attempting to delete {itemsToDelete.Count} items");
+
+            foreach (var item in itemsToDelete)
             {
-                await _ftpService.DeleteDirectoryAsync(configuration, itemToDelete.FullPath).ConfigureAwait(true);
-            }
-            else
-            {
-                await _ftpService.DeleteFileAsync(configuration, itemToDelete.FullPath).ConfigureAwait(true);
+                try
+                {
+                    StatusMessage = $"Deleting {item.Name}...";
+
+                    if (item.IsDirectory)
+                    {
+                        await _ftpService.DeleteDirectoryAsync(configuration, item.FullPath).ConfigureAwait(true);
+                    }
+                    else
+                    {
+                        await _ftpService.DeleteFileAsync(configuration, item.FullPath).ConfigureAwait(true);
+                    }
+
+                    successCount++;
+                    StaticFileLogger.LogInformation($"Successfully deleted: {item.Name}");
+                }
+                catch (Exception ex)
+                {
+                    StaticFileLogger.LogError($"Failed to delete {item.Name}: {ex.Message}");
+                    failCount++;
+                }
             }
 
             SelectedFtpItem = null;
+            SelectedFtpItems.Clear();
             await RefreshDirectoryAsync().ConfigureAwait(true);
 
-            StatusMessage = $"Successfully deleted {itemName}";
-            StaticFileLogger.LogInformation($"Delete completed: {itemName}");
+            if (itemsToDelete.Count > 1)
+            {
+                StatusMessage = $"Delete complete: {successCount} succeeded, {failCount} failed";
+            }
+            else
+            {
+                StatusMessage = successCount > 0 ? $"Successfully deleted {itemsToDelete[0].Name}" : "Delete failed";
+            }
         }
         catch (Exception ex)
         {
             StatusMessage = $"Delete failed: {ex.Message}";
-            StaticFileLogger.LogError($"Delete failed for {itemName}: {ex.Message}");
+            StaticFileLogger.LogError($"Delete operation failed: {ex.Message}");
         }
         finally
         {

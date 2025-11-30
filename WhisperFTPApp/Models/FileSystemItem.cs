@@ -12,6 +12,7 @@ public sealed class FileSystemItem
     public string Type { get; set; } = string.Empty;
     public FileSystemItem? Parent { get; set; }
     public ObservableCollection<FileSystemItem> Children { get; } = new();
+    public bool IsSelected { get; set; }
 
     public string GetRelativePath(string basePath)
     {

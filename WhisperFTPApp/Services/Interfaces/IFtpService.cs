@@ -12,4 +12,7 @@ public interface IFtpService
     Task DownloadFileAsync(FtpConfiguration configuration, string remotePath, string localPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
     Task DeleteFileAsync(FtpConfiguration configuration, string remotePath, CancellationToken cancellationToken = default);
     Task DeleteDirectoryAsync(FtpConfiguration configuration, string path, CancellationToken cancellationToken = default);
+    Task<bool> FileExistsAsync(FtpConfiguration configuration, string remotePath, CancellationToken cancellationToken = default);
+    Task<long> GetFileSizeAsync(FtpConfiguration configuration, string remotePath, CancellationToken cancellationToken = default);
+    Task<DateTime> GetFileModifiedTimeAsync(FtpConfiguration configuration, string remotePath, CancellationToken cancellationToken = default);
 }

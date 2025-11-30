@@ -1,6 +1,9 @@
 ﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:viewModels="clr-namespace:WhisperFTPApp.ViewModels"
+             xmlns:behaviors="clr-namespace:WhisperFTPApp.Behaviors"
+             xmlns:i="clr-namespace:Avalonia.Xaml.Interactivity;assembly=Avalonia.Xaml.Interactivity"
+             xmlns:ia="clr-namespace:Avalonia.Xaml.Interactions.Core;assembly=Avalonia.Xaml.Interactions"
              x:DataType="viewModels:MainWindowViewModel"
              x:Class="WhisperFTPApp.Views.MainView">
 
@@ -147,26 +150,30 @@
                                 Spacing="16"
                                 Margin="0,8,0,0">
                         <TextBlock
-                            Text="{Binding LocalFileStats.TotalItems, 
-                       StringFormat='Files: {0}'}" />
+                            Text="{Binding LocalFileStats.TotalItems, StringFormat='Files: {0}'}" />
                         <TextBlock
-                            Text="{Binding LocalFileStats.TotalSize, 
-                       Converter={StaticResource FileSizeConverter}, 
+                            Text="{Binding LocalFileStats.TotalSize,
+                       Converter={StaticResource FileSizeConverter},
                        StringFormat='Size: {0}'}" />
+                        <TextBlock
+                            Text="{Binding SelectedLocalItems.Count, StringFormat='Selected: {0}'}"
+                            IsVisible="{Binding SelectedLocalItems.Count}" />
                     </StackPanel>
 
-                    <!-- Local Files Grid -->
+                    <!-- Local Files Grid with Multiple Selection -->
                     <DataGrid ItemsSource="{Binding LocalItems}"
                               SelectedItem="{Binding SelectedLocalItem}"
+                              SelectionMode="Extended"
                               IsReadOnly="True"
                               AutoGenerateColumns="False"
                               Margin="0,8">
-                        <Interaction.Behaviors>
-                            <EventTriggerBehavior EventName="DoubleTapped">
-                                <InvokeCommandAction Command="{Binding NavigateToLocalDirectoryCommand}"
-                                                     CommandParameter="{Binding SelectedLocalItem}" />
-                            </EventTriggerBehavior>
-                        </Interaction.Behaviors>
+                        <i:Interaction.Behaviors>
+                            <behaviors:DataGridSelectionBehavior SelectedItems="{Binding SelectedLocalItems}" />
+                            <ia:EventTriggerBehavior EventName="DoubleTapped">
+                                <ia:InvokeCommandAction Command="{Binding NavigateToLocalDirectoryCommand}"
+                                                        CommandParameter="{Binding SelectedLocalItem}" />
+                            </ia:EventTriggerBehavior>
+                        </i:Interaction.Behaviors>
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="Name" Width="*">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -184,10 +191,10 @@
                             </DataGridTemplateColumn>
 
                             <DataGridTextColumn Header="Size"
-                                                Binding="{Binding Size, 
+                                                Binding="{Binding Size,
                                    Converter={StaticResource FileSizeConverter}}" />
                             <DataGridTextColumn Header="Modified"
-                                                Binding="{Binding Modified, 
+                                                Binding="{Binding Modified,
                                    StringFormat={}{0:g}}" />
                             <DataGridTextColumn Header="Type"
                                                 Binding="{Binding Type}" />
@@ -196,6 +203,7 @@
                 </DockPanel>
             </Border>
 
+            <!-- Remote Files Panel -->
             <Border Classes="panel" Grid.Column="2" Padding="16">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Spacing="8">
@@ -245,22 +253,28 @@
                                 Margin="0,8,0,0">
                         <TextBlock Text="{Binding RemoteFileStats.TotalItems, StringFormat='Files: {0}'}" />
                         <TextBlock
-                            Text="{Binding RemoteFileStats.TotalSize, 
-                       Converter={StaticResource FileSizeConverter}, 
+                            Text="{Binding RemoteFileStats.TotalSize,
+                       Converter={StaticResource FileSizeConverter},
                        StringFormat='Size: {0}'}" />
+                        <TextBlock
+                            Text="{Binding SelectedFtpItems.Count, StringFormat='Selected: {0}'}"
+                            IsVisible="{Binding SelectedFtpItems.Count}" />
                     </StackPanel>
 
+                    <!-- Remote Files Grid with Multiple Selection -->
                     <DataGrid ItemsSource="{Binding FtpItems}"
                               AutoGenerateColumns="False"
                               SelectedItem="{Binding SelectedFtpItem}"
+                              SelectionMode="Extended"
                               IsReadOnly="True"
                               Margin="0,8">
-                        <Interaction.Behaviors>
-                            <EventTriggerBehavior EventName="DoubleTapped">
-                                <InvokeCommandAction Command="{Binding NavigateToFolderCommand}"
-                                                     CommandParameter="{Binding SelectedFtpItem}" />
-                            </EventTriggerBehavior>
-                        </Interaction.Behaviors>
+                        <i:Interaction.Behaviors>
+                            <behaviors:DataGridSelectionBehavior SelectedItems="{Binding SelectedFtpItems}" />
+                            <ia:EventTriggerBehavior EventName="DoubleTapped">
+                                <ia:InvokeCommandAction Command="{Binding NavigateToFolderCommand}"
+                                                        CommandParameter="{Binding SelectedFtpItem}" />
+                            </ia:EventTriggerBehavior>
+                        </i:Interaction.Behaviors>
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="Name" Width="*">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -278,10 +292,10 @@
                             </DataGridTemplateColumn>
 
                             <DataGridTextColumn Header="Size"
-                                                Binding="{Binding Size, 
+                                                Binding="{Binding Size,
                                            Converter={StaticResource FileSizeConverter}}" />
                             <DataGridTextColumn Header="Modified"
-                                                Binding="{Binding Modified, 
+                                                Binding="{Binding Modified,
                                            StringFormat={}{0:g}}" />
                             <DataGridTextColumn Header="Type"
                                                 Binding="{Binding IsDirectory,

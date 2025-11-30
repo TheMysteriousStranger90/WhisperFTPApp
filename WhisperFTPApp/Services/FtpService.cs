@@ -426,6 +426,99 @@ internal sealed class FtpService : IFtpService
             throw;
         }
     }
+
+#pragma warning disable SYSLIB0014
+    public async Task<bool> FileExistsAsync(
+        FtpConfiguration configuration,
+        string remotePath,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(remotePath);
+
+        try
+        {
+            var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            var request = (FtpWebRequest)WebRequest.Create(uri);
+            request.Method = WebRequestMethods.Ftp.GetFileSize;
+            request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+            request.Timeout = ConnectionTimeout;
+            request.ReadWriteTimeout = ConnectionTimeout;
+            request.KeepAlive = false;
+            request.UsePassive = true;
+
+            using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
+            return true;
+        }
+        catch (WebException ex) when (ex.Response is FtpWebResponse ftpResponse &&
+                                      ftpResponse.StatusCode == FtpStatusCode.ActionNotTakenFileUnavailable)
+        {
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<long> GetFileSizeAsync(
+        FtpConfiguration configuration,
+        string remotePath,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(remotePath);
+
+        try
+        {
+            var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            var request = (FtpWebRequest)WebRequest.Create(uri);
+            request.Method = WebRequestMethods.Ftp.GetFileSize;
+            request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+            request.Timeout = ConnectionTimeout;
+            request.ReadWriteTimeout = ConnectionTimeout;
+            request.KeepAlive = false;
+            request.UsePassive = true;
+
+            using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
+            return response.ContentLength;
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Failed to get file size for {remotePath}: {ex.Message}");
+            return 0;
+        }
+    }
+
+    public async Task<DateTime> GetFileModifiedTimeAsync(
+        FtpConfiguration configuration,
+        string remotePath,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(remotePath);
+
+        try
+        {
+            var uri = new Uri($"{configuration.FtpAddress.TrimEnd('/')}/{remotePath.TrimStart('/')}");
+            var request = (FtpWebRequest)WebRequest.Create(uri);
+            request.Method = WebRequestMethods.Ftp.GetDateTimestamp;
+            request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+            request.Timeout = ConnectionTimeout;
+            request.ReadWriteTimeout = ConnectionTimeout;
+            request.KeepAlive = false;
+            request.UsePassive = true;
+
+            using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
+            return response.LastModified;
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Failed to get modified time for {remotePath}: {ex.Message}");
+            return DateTime.MinValue;
+        }
+    }
+
 #pragma warning restore SYSLIB0014
 
     private static FileSystemItem? ParseFtpListItem(string line, string currentPath)
