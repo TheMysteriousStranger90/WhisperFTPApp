@@ -40,13 +40,6 @@ public class ScanWindowViewModel : ReactiveObject, IDisposable
             StopScan,
             this.WhenAnyValue(x => x.IsScanning));
 
-        ConnectToSelectedNetworkCommand = ReactiveCommand.CreateFromTask(
-            ConnectToSelectedNetworkAsync,
-            this.WhenAnyValue(
-                x => x.SelectedNetwork,
-                x => x.IsScanning,
-                (network, scanning) => network != null && !scanning));
-
         var canConnectToFtp = this.WhenAnyValue(x => x.SelectedFtpServer)
             .Select(server => server != null);
 
@@ -64,7 +57,6 @@ public class ScanWindowViewModel : ReactiveObject, IDisposable
 
     public ReactiveCommand<Unit, Unit> StartScanCommand { get; }
     public ReactiveCommand<Unit, Unit> StopScanCommand { get; }
-    public ReactiveCommand<Unit, Unit> ConnectToSelectedNetworkCommand { get; }
     public ReactiveCommand<Unit, Unit> ConnectToFtpServerCommand { get; }
     public ReactiveCommand<Unit, Unit> ExportResultsCommand { get; }
     public ReactiveCommand<Unit, Unit> ClearResultsCommand { get; }
@@ -197,49 +189,6 @@ public class ScanWindowViewModel : ReactiveObject, IDisposable
                         $"• FTP servers found: {FtpServers.Count}\n" +
                         $"• Networks needing connection: {requiresConnection}\n" +
                         $"✓ Your connection: stable";
-    }
-
-    private async Task ConnectToSelectedNetworkAsync()
-    {
-        if (SelectedNetwork == null) return;
-
-        StatusMessage = $"WARNING: Connecting to '{SelectedNetwork.SSID}' will:\n" +
-                        $"• Disconnect your current network\n" +
-                        $"• Interrupt active connections\n" +
-                        $"• Allow FTP scan of that network\n" +
-                        $"Connecting in 2 seconds...";
-
-        await Task.Delay(2000).ConfigureAwait(false);
-
-        try
-        {
-            StatusMessage = $"Connecting to {SelectedNetwork.SSID}...";
-            var connected = await _wifiScanner.ConnectToNetworkAsync(SelectedNetwork.SSID)
-                .ConfigureAwait(false);
-
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                if (connected)
-                {
-                    StatusMessage = $"✓ Connected to {SelectedNetwork.SSID}\n" +
-                                    $"━━━━━━━━━━━━━━━━━━━━\n" +
-                                    $"IMPORTANT:\n" +
-                                    $"• Restart the scan to check FTP in this network\n" +
-                                    $"• Your previous connection was terminated";
-                    StaticFileLogger.LogInformation($"Successfully connected to {SelectedNetwork.SSID}");
-                }
-                else
-                {
-                    StatusMessage = $"✗ Failed to connect to {SelectedNetwork.SSID}\n" +
-                                    $"Your original connection should still be active.";
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"❌ Connection error: {ex.Message}";
-            StaticFileLogger.LogError($"Failed to connect: {ex.Message}");
-        }
     }
 
     private void ConnectToFtpServer()
@@ -393,7 +342,7 @@ public class ScanWindowViewModel : ReactiveObject, IDisposable
                      e.Network.ScanStatus == Enums.FtpScanStatus.RequiresConnection)
             {
                 StatusMessage = $"Found open network: {e.Network.SSID}\n" +
-                                $"Connect manually to scan FTP";
+                                $"FTP scan not available (not connected)";
             }
         });
     }

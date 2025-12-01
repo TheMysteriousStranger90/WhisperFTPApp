@@ -135,48 +135,18 @@
                 <TabItem Header="Available Networks">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
-                            <!-- Warning Banner -->
-                            <Border Background="#FF6B00" Padding="12" CornerRadius="6"
-                                    IsVisible="{Binding SelectedNetwork, Converter={x:Static ObjectConverters.IsNotNull}}">
-                                <StackPanel Spacing="8">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <PathIcon Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"
-                                                  Foreground="White"
-                                                  Width="20"
-                                                  Height="20"/>
-                                        <TextBlock Text="⚠️ CRITICAL WARNING"
-                                                  Foreground="White"
-                                                  FontWeight="Bold"
-                                                  FontSize="13"/>
-                                    </StackPanel>
-                                    <TextBlock TextWrapping="Wrap" Foreground="White" FontSize="12" Margin="28,0,0,0">
-                                        <Run Text="Connecting to another network will:" FontWeight="SemiBold"/>
-                                        <LineBreak/>
-                                        <Run Text="• Terminate your current connection"/>
-                                        <LineBreak/>
-                                        <Run Text="• Interrupt all active transfers and sessions"/>
-                                        <LineBreak/>
-                                        <Run Text="• Require application restart for full functionality"/>
-                                        <LineBreak/>
-                                        <Run Text="• Allow FTP scanning of the target network" FontWeight="SemiBold"/>
-                                    </TextBlock>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Controls -->
+                            <!-- Info Panel -->
                             <Border Classes="panel" Padding="12">
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <Button Command="{Binding ConnectToSelectedNetworkCommand}"
-                                            Classes="danger"
-                                            IsEnabled="{Binding SelectedNetwork, Converter={x:Static ObjectConverters.IsNotNull}}">
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" Width="16" Height="16"/>
-                                            <TextBlock Text="Connect &amp; Scan FTP (Risky!)"/>
-                                        </StackPanel>
-                                    </Button>
-                                    <TextBlock Text="{Binding Networks.Count, StringFormat='Total: {0}'}"
-                                              VerticalAlignment="Center"
-                                              Opacity="0.7"/>
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="{Binding Networks.Count, StringFormat='Total Networks: {0}'}"
+                                              FontSize="14"
+                                              FontWeight="SemiBold"/>
+                                    <Border Background="#222" Padding="8" CornerRadius="4">
+                                        <TextBlock Foreground="White" FontSize="11" TextWrapping="Wrap">
+                                            <Run Text="Info: "/>
+                                            <Run Text="This list shows all discoverable WiFi networks. Only your current network is scanned for FTP servers."/>
+                                        </TextBlock>
+                                    </Border>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -285,10 +255,10 @@
                                     </TextBlock>
                                 </StackPanel>
 
-                                <Border Background="#1B5E20" Padding="8" CornerRadius="4">
+                                <Border Background="#222" Padding="8" CornerRadius="4">
                                     <TextBlock Foreground="White" FontSize="11" TextWrapping="Wrap">
-                                        <Run Text="ℹ️ Info: "/>
-                                        <Run Text="These FTP servers are in YOUR current network. To scan other networks, you must connect to them first."/>
+                                        <Run Text="Info: "/>
+                                        <Run Text="These FTP servers are in YOUR current network. To scan other networks, connect to them first using Windows network settings."/>
                                     </TextBlock>
                                 </Border>
                             </StackPanel>
