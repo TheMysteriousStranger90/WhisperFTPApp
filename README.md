@@ -30,10 +30,38 @@ AzioWhisper FTP is app designed for seamless file management and transfer operat
 - **Comprehensive Logging** - Track all operations
 - **Responsive UI** - Smooth animations and transitions
 
+## Application Data Directory
+
+AzioWhisper FTP stores all application data in your Documents folder for easy access and backup:
+
+**Application Data Directory:**
+```
+%USERPROFILE%\Documents\AzioWhisperFTP\
+```
+
+**Database Location:**
+```
+%USERPROFILE%\Documents\AzioWhisperFTP\Data\DatabaseAzioWhisperFTP.db
+```
+- Stores connection history, settings, and cached network scan data
+- SQLite database format
+- Automatically created on first run
+
+**Log Files Location:**
+```
+%USERPROFILE%\Documents\AzioWhisperFTP\Logs\aziowhisperFTP_YYYYMMDD.log
+```
+- Daily log files with timestamp (e.g., `aziowhisperFTP_20251201.log`)
+- Contains detailed operation logs, errors, and debug information
+- Automatically rotated daily
+- Safe to delete old log files to free up space
+
 
 ![Image 2](Screenshots/Screen2.png)
 ![Image 3](Screenshots/Screen3.png)
 ![Image 4](Screenshots/Screen4.png)
+![Image 5](Screenshots/Screen5.png)
+![Image 6](Screenshots/Screen6.png)
 
 ## 🛠️ Technical Stack
 
