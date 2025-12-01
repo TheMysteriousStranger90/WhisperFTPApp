@@ -1,49 +1,52 @@
-# WhisperFTPApp
-![Image 1](Screenshots/Screen1.png)
-WhisperFTPApp is FTP app designed for seamless file management and transfer operations.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![.NET Version](https://img.shields.io/badge/.NET-9.0-purple.svg)](https://dotnet.microsoft.com/download)
+[![Platform](https://img.shields.io/badge/Platform-Windows-blue.svg)](https://www.microsoft.com/windows)
 
-## Features
-- 📁 Dual-pane file management interface
-- 🔄 FTP operations support (upload, download, delete)
-- 🎨 Customizable background themes
-- 📝 Built-in logging system
-- 💾 Recent connections history
-- 🌍 Multi-language support (English, Russian)
-- 📡 WiFi Network Scanner & FTP Port Analysis* (last feature are not implemented correct yet)
+# AzioWhisper FTP
+
+![Image 1](Screenshots/Screen1.png)
+AzioWhisper FTP is app designed for seamless file management and transfer operations.
+
+## Key Features
+
+### File Management
+- **Dual-Pane Interface** - Navigate local and remote files simultaneously
+- **Multi-Selection** - Select and transfer multiple files at once
+
+### FTP Operations
+- **Full FTP/FTPS Support** - Secure and standard FTP connections
+- **Resume Transfers** - Continue interrupted downloads/uploads
+- **Recursive Operations** - Upload/download entire directory trees
+- **Progress Tracking** - Real-time transfer progress indicators
+
+### Network Scanner
+- **Hybrid Scan Mode** - Passive WiFi discovery + Active FTP scanning
+- **Real-Time Discovery** - Continuous network monitoring
+
+### User Experience
+- **Custom Backgrounds** - Personalize your workspace
+- **Multi-Language** - English and Russian support
+- **Session History** - Recent connections with quick access
+- **Comprehensive Logging** - Track all operations
+- **Responsive UI** - Smooth animations and transitions
 
 
 ![Image 2](Screenshots/Screen2.png)
 ![Image 3](Screenshots/Screen3.png)
 ![Image 4](Screenshots/Screen4.png)
 
-## Technical Stack
-- Framework: .NET 7
-- UI: Avalonia UI
-- Architecture: MVVM pattern
-- Database: SQLite
-- Reactive Extensions: ReactiveUI
+## 🛠️ Technical Stack
 
-## Core Functionality
-
-####  FTP Operations
-- Connect to FTP servers
-- Browse remote directories
-- Upload/Download files and folders
-- Delete remote files
-- View file properties
-
-####  File Management
-- Local file system navigation
-- Drive selection
-- File size and type display
-- Modified date tracking
-
-####  User Experience
-- Background customization
-- Session logging
-- Connection history
-- Progress indicators
-- Status messages
+| Component | Technology |
+|-----------|-----------|
+| **Framework** | .NET 9.0 |
+| **UI Framework** | Avalonia UI 11.x |
+| **Architecture** | MVVM Pattern |
+| **Reactive Programming** | ReactiveUI + System.Reactive |
+| **Database** | SQLite + Entity Framework Core |
+| **Networking** | Native WiFi API (ManagedWifi) |
+| **Dependency Injection** | Microsoft.Extensions.DependencyInjection |
+| **Code Analysis** | SonarAnalyzer, Roslyn Analyzers |
 
 ## Contributing
 

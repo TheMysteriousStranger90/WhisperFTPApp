@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using ReactiveUI;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
+using WhisperFTPApp.Services;
 using WhisperFTPApp.Services.Interfaces;
 
 namespace WhisperFTPApp.ViewModels;
@@ -124,9 +125,10 @@ public class ScanWindowViewModel : ReactiveObject, IDisposable
         try
         {
             IsScanning = true;
-            StatusMessage = "  Starting HYBRID scan...\n" +
+            StatusMessage = "Starting HYBRID scan...\n" +
                             "• Discovering WiFi networks\n" +
                             "• Scanning FTP in current network only\n" +
+                            "• Using smart cache to avoid re-scanning\n" +
                             "Your connection remains stable.";
 
             Networks.Clear();
@@ -147,12 +149,12 @@ public class ScanWindowViewModel : ReactiveObject, IDisposable
                     var requiresConnection =
                         Networks.Count(n => n.ScanStatus == Enums.FtpScanStatus.RequiresConnection);
 
-                    StatusMessage = $" Hybrid scan complete!\n" +
+                    StatusMessage = $"✓ Hybrid scan complete!\n" +
                                     $"━━━━━━━━━━━━━━━━━━━━\n" +
-                                    $" Networks found: {Networks.Count} (Open: {openNetworks})\n" +
-                                    $" FTP servers: {FtpServers.Count}\n" +
-                                    $" Require connection: {requiresConnection}\n" +
-                                    $" Your connection: stable";
+                                    $"Networks found: {Networks.Count} (Open: {openNetworks})\n" +
+                                    $"FTP servers: {FtpServers.Count}\n" +
+                                    $"Require connection: {requiresConnection}\n" +
+                                    $"✓ Your connection: stable";
                 });
             }
         }
@@ -181,9 +183,9 @@ public class ScanWindowViewModel : ReactiveObject, IDisposable
         var openNetworks = Networks.Count(n => n.SecurityType == "IEEE80211_Open");
         var requiresConnection = Networks.Count(n => n.ScanStatus == Enums.FtpScanStatus.RequiresConnection);
 
-        StatusMessage = $"  Scan stopped.\n" +
+        StatusMessage = $"Scan stopped.\n" +
                         $"━━━━━━━━━━━━━━━━━━━━\n" +
-                        $"  Results summary:\n" +
+                        $"Results summary:\n" +
                         $"• Total networks: {Networks.Count}\n" +
                         $"• Open networks: {openNetworks}\n" +
                         $"• FTP servers found: {FtpServers.Count}\n" +
@@ -228,9 +230,10 @@ public class ScanWindowViewModel : ReactiveObject, IDisposable
             await writer.WriteLineAsync(new string('=', 70)).ConfigureAwait(false);
             await writer.WriteLineAsync().ConfigureAwait(false);
 
-            await writer.WriteLineAsync("SCAN MODE: HYBRID").ConfigureAwait(false);
+            await writer.WriteLineAsync("SCAN MODE: HYBRID (SMART CACHE)").ConfigureAwait(false);
             await writer.WriteLineAsync("• WiFi networks: Passive discovery").ConfigureAwait(false);
             await writer.WriteLineAsync("• FTP scanning: Active (current network only)").ConfigureAwait(false);
+            await writer.WriteLineAsync("• Cache: Prevents redundant scans of same networks").ConfigureAwait(false);
             await writer.WriteLineAsync("• Connection: Remained stable throughout scan").ConfigureAwait(false);
             await writer.WriteLineAsync().ConfigureAwait(false);
 
@@ -313,7 +316,13 @@ public class ScanWindowViewModel : ReactiveObject, IDisposable
         FoundNetworksCount = 0;
         ScannedHostsCount = 0;
         FoundFtpServersCount = 0;
-        StatusMessage = "Results cleared. Ready for new scan.";
+
+        if (_wifiScanner is WifiScannerService service)
+        {
+            service.ClearScanCache();
+        }
+
+        StatusMessage = "Results and cache cleared. Ready for new scan.";
     }
 
     private void OnNetworkFound(NetworkFoundEventArgs e)
