@@ -35,14 +35,14 @@
                               Height="20" />
                 </Button>
                 <Button Classes="navButton"
-                        Command="{Binding ShowSettingsCommand}">
-                    <PathIcon Data="{StaticResource SettingsIcon}"
+                        Command="{Binding ShowScanViewCommand}">
+                    <PathIcon Data="{StaticResource ScanIcon}"
                               Width="20"
                               Height="20" />
                 </Button>
                 <Button Classes="navButton"
-                        Command="{Binding ShowScanViewCommand}">
-                    <PathIcon Data="{StaticResource ScanIcon}"
+                        Command="{Binding ShowSettingsCommand}">
+                    <PathIcon Data="{StaticResource SettingsIcon}"
                               Width="20"
                               Height="20" />
                 </Button>

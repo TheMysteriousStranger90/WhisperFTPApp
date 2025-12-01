@@ -7,22 +7,24 @@
 
     <Border Classes="panel" Padding="16">
         <DockPanel>
+            <!-- Header -->
             <Border Classes="panel" DockPanel.Dock="Top" Padding="16" Margin="0,0,0,16">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="{DynamicResource WifiScanner}" 
-                             FontSize="24" 
+                <StackPanel Spacing="12">
+                    <TextBlock Text="{DynamicResource WifiScanner}"
+                             FontSize="24"
                              FontWeight="SemiBold"/>
-                    
+
+                    <!-- Control Buttons -->
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Command="{Binding StartScanCommand}"
                                 Classes="primary"
                                 IsEnabled="{Binding !IsScanning}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <PathIcon Data="{StaticResource RefreshIcon}"/>
-                                <TextBlock Text="{DynamicResource StartScan}"/>
+                                <TextBlock Text="Start Hybrid Scan"/>
                             </StackPanel>
                         </Button>
-                        
+
                         <Button Command="{Binding StopScanCommand}"
                                 Classes="danger"
                                 IsEnabled="{Binding IsScanning}">
@@ -31,12 +33,67 @@
                                 <TextBlock Text="{DynamicResource StopScan}"/>
                             </StackPanel>
                         </Button>
+
+                        <Button Command="{Binding ClearResultsCommand}"
+                                IsEnabled="{Binding !IsScanning}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                <TextBlock Text="Clear"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
 
+                    <!-- Info Banner -->
+                    <Border Background="#56001f" Padding="12" CornerRadius="6" Margin="0,8,0,0">
+                        <StackPanel Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+                                          Foreground="White"
+                                          Width="20"
+                                          Height="20"/>
+                                <TextBlock Text="HYBRID SCAN MODE"
+                                          Foreground="White"
+                                          FontSize="14"
+                                          FontWeight="Bold"/>
+                            </StackPanel>
+                            <TextBlock TextWrapping="Wrap" Foreground="White" FontSize="12" Margin="32,0,0,0">
+                                <Run Text="✓ WiFi Discovery: "/>
+                                <Run Text="Passive - finds all networks without connecting" FontWeight="SemiBold"/>
+                                <LineBreak/>
+                                <Run Text="✓ FTP Scanning: "/>
+                                <Run Text="Active - scans ONLY your current network" FontWeight="SemiBold"/>
+                                <LineBreak/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Statistics Panel -->
+                    <Border Classes="panel" Padding="12" Background="#10FFFFFF" Margin="0,8,0,0">
+                        <Grid ColumnDefinitions="*,*,*,*">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="Networks Found" FontSize="11" Opacity="0.7"/>
+                                <TextBlock Text="{Binding FoundNetworksCount}" FontSize="20" FontWeight="Bold"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="Hosts Scanned" FontSize="11" Opacity="0.7"/>
+                                <TextBlock Text="{Binding ScannedHostsCount}" FontSize="20" FontWeight="Bold"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="4">
+                                <TextBlock Text="FTP Servers" FontSize="11" Opacity="0.7"/>
+                                <TextBlock Text="{Binding FoundFtpServersCount}" FontSize="20" FontWeight="Bold"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" Spacing="4">
+                                <TextBlock Text="Scan Mode" FontSize="11" Opacity="0.7"/>
+                                <TextBlock Text="{Binding ScanMode}" FontSize="14" FontWeight="Bold"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Progress Bar -->
                     <ProgressBar Value="{Binding ScanProgress}"
+                               Maximum="100"
                                IsVisible="{Binding IsScanning}"
-                               Height="2"
-                               Margin="0,8"/>
+                               Height="4"/>
                 </StackPanel>
             </Border>
 
@@ -45,16 +102,18 @@
                 <StackPanel Orientation="Horizontal" Spacing="16">
                     <Panel Width="24" Height="24" IsVisible="{Binding IsScanning}">
                         <PathIcon Data="{StaticResource RefreshIcon}">
+                            <PathIcon.RenderTransform>
+                                <RotateTransform/>
+                            </PathIcon.RenderTransform>
                             <PathIcon.Styles>
                                 <Style Selector="PathIcon">
                                     <Style.Animations>
-                                        <Animation Duration="0:0:1"
-                                                 IterationCount="Infinite">
+                                        <Animation Duration="0:0:1" IterationCount="Infinite">
                                             <KeyFrame Cue="0%">
-                                                <Setter Property="RotateTransform.Angle" Value="0" />
+                                                <Setter Property="RotateTransform.Angle" Value="0"/>
                                             </KeyFrame>
                                             <KeyFrame Cue="100%">
-                                                <Setter Property="RotateTransform.Angle" Value="360" />
+                                                <Setter Property="RotateTransform.Angle" Value="360"/>
                                             </KeyFrame>
                                         </Animation>
                                     </Style.Animations>
@@ -62,92 +121,228 @@
                             </PathIcon.Styles>
                         </PathIcon>
                     </Panel>
-                    <TextBlock Text="{Binding StatusMessage}" 
-                             FontSize="14" 
+                    <TextBlock Text="{Binding StatusMessage}"
+                             FontSize="13"
                              TextWrapping="Wrap"
-                             HorizontalAlignment="Center"
-                             VerticalAlignment="Center" />
+                             VerticalAlignment="Center"
+                             FontFamily="Consolas, Courier New, monospace"/>
                 </StackPanel>
             </Border>
 
-            <!-- Networks Grids -->
-            <Grid RowDefinitions="*,*" Margin="0,8">
-                <Border Classes="panel" Grid.Row="0" Margin="0,0,0,8">
+            <!-- Main Content - Tabs -->
+            <TabControl Margin="0,8">
+                <!-- Available Networks Tab -->
+                <TabItem Header="Available Networks">
                     <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" 
-                                 Text="{DynamicResource AvailableNetworks}" 
-                                 FontWeight="SemiBold"
-                                 Margin="8"/>
-                        
+                        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
+                            <!-- Warning Banner -->
+                            <Border Background="#FF6B00" Padding="12" CornerRadius="6"
+                                    IsVisible="{Binding SelectedNetwork, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <StackPanel Spacing="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <PathIcon Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"
+                                                  Foreground="White"
+                                                  Width="20"
+                                                  Height="20"/>
+                                        <TextBlock Text="⚠️ CRITICAL WARNING"
+                                                  Foreground="White"
+                                                  FontWeight="Bold"
+                                                  FontSize="13"/>
+                                    </StackPanel>
+                                    <TextBlock TextWrapping="Wrap" Foreground="White" FontSize="12" Margin="28,0,0,0">
+                                        <Run Text="Connecting to another network will:" FontWeight="SemiBold"/>
+                                        <LineBreak/>
+                                        <Run Text="• Terminate your current connection"/>
+                                        <LineBreak/>
+                                        <Run Text="• Interrupt all active transfers and sessions"/>
+                                        <LineBreak/>
+                                        <Run Text="• Require application restart for full functionality"/>
+                                        <LineBreak/>
+                                        <Run Text="• Allow FTP scanning of the target network" FontWeight="SemiBold"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Controls -->
+                            <Border Classes="panel" Padding="12">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Button Command="{Binding ConnectToSelectedNetworkCommand}"
+                                            Classes="danger"
+                                            IsEnabled="{Binding SelectedNetwork, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <PathIcon Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" Width="16" Height="16"/>
+                                            <TextBlock Text="Connect &amp; Scan FTP (Risky!)"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <TextBlock Text="{Binding Networks.Count, StringFormat='Total: {0}'}"
+                                              VerticalAlignment="Center"
+                                              Opacity="0.7"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
                         <DataGrid ItemsSource="{Binding Networks}"
+                                SelectedItem="{Binding SelectedNetwork}"
                                 AutoGenerateColumns="False"
-                                IsReadOnly="True">
+                                IsReadOnly="True"
+                                SelectionMode="Single">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="SSID" 
+                                <DataGridTextColumn Header="SSID"
                                                   Binding="{Binding SSID}"
                                                   Width="200"/>
-                                <DataGridTextColumn Header="BSSID" 
+                                <DataGridTextColumn Header="BSSID"
                                                   Binding="{Binding BSSID}"
                                                   Width="150"/>
-                                <DataGridTextColumn Header="{DynamicResource Signal}"
-                                                  Binding="{Binding SignalStrength}"
-                                                  Width="120"/>
-                                <DataGridTextColumn Header="{DynamicResource Channel}"
+                                <DataGridTextColumn Header="Signal"
+                                                  Binding="{Binding SignalStrength, StringFormat='{}{0} dBm'}"
+                                                  Width="100"/>
+                                <DataGridTextColumn Header="Channel"
                                                   Binding="{Binding Channel}"
-                                                  Width="120"/>
-                                <DataGridTextColumn Header="{DynamicResource Security}"
+                                                  Width="80"/>
+                                <DataGridTextColumn Header="Security"
                                                   Binding="{Binding SecurityType}"
-                                                  Width="120"/>
-                                <DataGridTextColumn Header="{DynamicResource LastSeen}"
-                                                  Binding="{Binding LastSeen, StringFormat={}{0:g}}"
-                                                  Width="200"/>
+                                                  Width="150"/>
+                                <DataGridTemplateColumn Header="FTP Status" Width="150">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding ScanStatus}"
+                                                      VerticalAlignment="Center"
+                                                      HorizontalAlignment="Center">
+                                                <TextBlock.Foreground>
+                                                    <MultiBinding Converter="{x:Static global:ScanStatusColorConverter.Instance}">
+                                                        <Binding Path="ScanStatus"/>
+                                                    </MultiBinding>
+                                                </TextBlock.Foreground>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Last Seen"
+                                                  Binding="{Binding LastSeen, StringFormat='{}{0:HH:mm:ss}'}"
+                                                  Width="100"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </DockPanel>
-                </Border>
+                </TabItem>
 
-                <Border Classes="panel" Grid.Row="1" Margin="0,8,0,0">
+                <!-- Connected Networks Tab -->
+                <TabItem Header="Current Network Details">
+                    <DataGrid ItemsSource="{Binding ConnectedNetworks}"
+                            AutoGenerateColumns="False"
+                            IsReadOnly="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="SSID"
+                                              Binding="{Binding SSID}"
+                                              Width="180"/>
+                            <DataGridTextColumn Header="IP Address"
+                                              Binding="{Binding IpAddress}"
+                                              Width="140"/>
+                            <DataGridTextColumn Header="Gateway"
+                                              Binding="{Binding Gateway}"
+                                              Width="140"/>
+                            <DataGridTextColumn Header="Subnet"
+                                              Binding="{Binding SubnetMask}"
+                                              Width="140"/>
+                            <DataGridTemplateColumn Header="FTP Status" Width="120">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                            <Ellipse Width="10" Height="10"
+                                                   Fill="{Binding HasOpenFtp, Converter={x:Static global:FtpStatusConverter.Instance}}"/>
+                                            <TextBlock Text="{Binding ScanStatus}" FontSize="11"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="FTP Server"
+                                              Binding="{Binding FtpServerAddress}"
+                                              Width="140"/>
+                            <DataGridTextColumn Header="Speed"
+                                              Binding="{Binding Speed}"
+                                              Width="100"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </TabItem>
+
+                <!-- FTP Servers Tab -->
+                <TabItem Header="FTP Servers (Current Network)">
                     <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" 
-                                 Text="{DynamicResource ConnectedNetworks}"
-                                 FontWeight="SemiBold"
-                                 Margin="8"/>
-                        
-                        <DataGrid ItemsSource="{Binding ConnectedNetworks}"
+                        <Border Classes="panel" DockPanel.Dock="Top" Padding="12" Margin="0,0,0,8">
+                            <StackPanel Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Button Command="{Binding ConnectToFtpServerCommand}"
+                                            Classes="primary"
+                                            IsEnabled="{Binding SelectedFtpServer, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <PathIcon Data="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 12H5V8h14v10z" Width="16" Height="16"/>
+                                            <TextBlock Text="View Server Details"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <TextBlock VerticalAlignment="Center" FontSize="13">
+                                        <Run Text="Found:"/>
+                                        <Run Text="{Binding FtpServers.Count}" FontWeight="Bold" Foreground="#4CAF50"/>
+                                        <Run Text="server(s) in your current network"/>
+                                    </TextBlock>
+                                </StackPanel>
+
+                                <Border Background="#1B5E20" Padding="8" CornerRadius="4">
+                                    <TextBlock Foreground="White" FontSize="11" TextWrapping="Wrap">
+                                        <Run Text="ℹ️ Info: "/>
+                                        <Run Text="These FTP servers are in YOUR current network. To scan other networks, you must connect to them first."/>
+                                    </TextBlock>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <DataGrid ItemsSource="{Binding FtpServers}"
+                                SelectedItem="{Binding SelectedFtpServer}"
                                 AutoGenerateColumns="False"
-                                IsReadOnly="True">
+                                IsReadOnly="True"
+                                SelectionMode="Single">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="SSID" 
-                                                  Binding="{Binding SSID}"
-                                                  Width="200"/>
-                                <DataGridTextColumn Header="IP Address" 
+                                <DataGridTextColumn Header="IP Address"
                                                   Binding="{Binding IpAddress}"
+                                                  Width="140"/>
+                                <DataGridTextColumn Header="Port"
+                                                  Binding="{Binding Port}"
+                                                  Width="80"/>
+                                <DataGridTextColumn Header="Server Type"
+                                                  Binding="{Binding ServerType}"
                                                   Width="150"/>
-                                <DataGridTemplateColumn Header="{DynamicResource FtpStatus}"
-                                                      Width="120">
+                                <DataGridTemplateColumn Header="Anonymous" Width="100">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                                <Ellipse Width="12" 
-                                                         Height="12"
-                                                         Fill="{Binding HasOpenFtp, Converter={x:Static global:FtpStatusConverter.Instance}}"/>
-                                                <TextBlock Text="{Binding HasOpenFtp}"
-                                                          VerticalAlignment="Center"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                                <Ellipse Width="10"
+                                                         Height="10"
+                                                         Fill="{Binding IsAnonymousAllowed, Converter={x:Static global:BoolToBrushConverter.Instance}}"/>
+                                                <TextBlock Text="{Binding IsAnonymousAllowed}" FontSize="11"/>
                                             </StackPanel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="{DynamicResource Security}"
-                                                  Binding="{Binding SecurityType}"
-                                                  Width="120"/>
-                                <DataGridTextColumn Header="{DynamicResource LastConnected}"
-                                                  Binding="{Binding LastSeen, StringFormat={}{0:g}}"
-                                                  Width="150"/>
+                                <DataGridTemplateColumn Header="SSL" Width="80">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding SupportsSSL}"
+                                                      HorizontalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Response"
+                                                  Binding="{Binding ResponseTime, Converter={x:Static global:TimeSpanToMillisecondsConverter.Instance}}"
+                                                  Width="100"/>
+                                <DataGridTextColumn Header="Banner"
+                                                  Binding="{Binding ServerBanner}"
+                                                  Width="*"/>
+                                <DataGridTextColumn Header="Found At"
+                                                  Binding="{Binding DiscoveredAt, StringFormat='{}{0:HH:mm:ss}'}"
+                                                  Width="100"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </DockPanel>
-                </Border>
-            </Grid>
+                </TabItem>
+            </TabControl>
         </DockPanel>
     </Border>
 </UserControl>
