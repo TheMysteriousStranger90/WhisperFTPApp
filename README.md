@@ -88,12 +88,16 @@ Bohdan Harabadzhyu
 
 [MIT](https://choosealicense.com/licenses/mit/)
 
+## Microsoft Store
+
+[![Get it from Microsoft Store](https://get.microsoft.com/images/en-us%20dark.svg)](https://apps.microsoft.com/detail/9N73GM6JPBXZ)
+
+## SourceForge
+[![Download WhisperFTPApp](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/whisperftpapp/files/latest/download)
+
 ## YouTube Review
 <details>
 <summary>📺 Watch Video Review</summary>
 
 [![YouTube](http://i.ytimg.com/vi/uSTPpDcKVKc/hqdefault.jpg)](https://www.youtube.com/watch?v=uSTPpDcKVKc)
 </details>
-
-## SourceForge
-[![Download WhisperFTPApp](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/whisperftpapp/files/latest/download)
