@@ -58,7 +58,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
     private string _backgroundPath = string.Empty;
     private int _timeout = 10000;
     private int _readWriteTimeout = 30000;
-    private bool _enableSsl;
+    private bool _enableSsl = true;
     private bool _usePassive = true;
     private int _bufferSize = 131072;
     private int _maxRetries = 3;

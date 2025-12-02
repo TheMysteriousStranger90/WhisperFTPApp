@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Net;
+using System.Net.Security;
 using WhisperFTPApp.Configurations;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
@@ -796,16 +797,28 @@ internal sealed class FtpService : IFtpService
 #pragma warning disable SYSLIB0014
         var request = (FtpWebRequest)WebRequest.Create(uri);
         request.Credentials = new NetworkCredential(configuration.Username, configuration.Password);
+        request.EnableSsl = configuration.EnableSsl;
+        if (configuration.EnableSsl)
+        {
+            ServicePointManager.ServerCertificateValidationCallback =
+                (sender, certificate, chain, sslPolicyErrors) =>
+                {
+                    if (sslPolicyErrors == SslPolicyErrors.None)
+                        return true;
+                    StaticFileLogger.LogWarning($"SSL Certificate Error: {sslPolicyErrors}");
+                    return false;
+                };
+        }
+
+        request.UsePassive = configuration.UsePassive;
+        request.UseBinary = true;
+        request.KeepAlive = true;
         request.Timeout = configuration.Timeout > 0 ? configuration.Timeout : ConnectionTimeout;
         request.ReadWriteTimeout = configuration.ReadWriteTimeout > 0
             ? configuration.ReadWriteTimeout
             : ConnectionTimeout;
-        request.KeepAlive = true;
-        request.UsePassive = configuration.UsePassive;
-        request.UseBinary = true;
 
         _currentRequest = request;
-
         return request;
 #pragma warning restore SYSLIB0014
     }
