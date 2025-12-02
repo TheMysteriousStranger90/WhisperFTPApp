@@ -34,10 +34,22 @@ internal static class NetworkUtils
 
         foreach (var network in networks)
         {
-            return network.dot11DefaultAuthAlgorithm.ToString();
+            if (!network.securityEnabled)
+            {
+                return "IEEE80211_Open";
+            }
+
+            return network.dot11DefaultAuthAlgorithm switch
+            {
+                Wlan.Dot11AuthAlgorithm.RSNA => "WPA2",
+                Wlan.Dot11AuthAlgorithm.WPA => "WPA",
+                Wlan.Dot11AuthAlgorithm.WPA_PSK => "WPA_PSK",
+                Wlan.Dot11AuthAlgorithm.IEEE80211_Open => "Open",
+                _ => network.dot11DefaultAuthAlgorithm.ToString()
+            };
         }
 
-        return "IEEE80211_Open";
+        return "Unknown";
     }
 
     public static int GetChannelFromFrequency(uint frequency)
@@ -79,6 +91,7 @@ internal static class NetworkUtils
             {
                 return (true, "Open");
             }
+
             return (false, "Closed");
         }
         catch (Exception)

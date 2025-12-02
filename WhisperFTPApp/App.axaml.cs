@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
@@ -21,15 +22,18 @@ public partial class App : Application
     {
         AvaloniaXamlLoader.Load(this);
 
-        try
+        if (!Design.IsDesignMode)
         {
-            StaticFileLogger.LogInformation("Setting initial language...");
-            LocalizationService.Instance.SetLanguage("en");
-            StaticFileLogger.LogInformation("Language set successfully");
-        }
-        catch (Exception ex)
-        {
-            StaticFileLogger.LogError($"Error setting language: {ex}");
+            try
+            {
+                StaticFileLogger.LogInformation("Setting initial language...");
+                LocalizationService.Instance.SetLanguage("en");
+                StaticFileLogger.LogInformation("Language set successfully");
+            }
+            catch (Exception ex)
+            {
+                StaticFileLogger.LogError($"Error setting language: {ex}");
+            }
         }
     }
 
@@ -47,7 +51,10 @@ public partial class App : Application
 
             _serviceProvider = collection.BuildServiceProvider();
 
-            InitializeDatabase(_serviceProvider);
+            if (!Design.IsDesignMode)
+            {
+                InitializeDatabase(_serviceProvider);
+            }
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
@@ -55,14 +62,20 @@ public partial class App : Application
 
                 desktop.Exit += OnExit;
 
-                StaticFileLogger.LogInformation("Application initialized successfully");
+                if (!Design.IsDesignMode)
+                {
+                    StaticFileLogger.LogInformation("Application initialized successfully");
+                }
             }
 
             base.OnFrameworkInitializationCompleted();
         }
         catch (Exception ex)
         {
-            StaticFileLogger.LogError($"Application startup failed: {ex.Message}\nStackTrace: {ex.StackTrace}");
+            if (!Design.IsDesignMode)
+            {
+                StaticFileLogger.LogError($"Application startup failed: {ex.Message}\nStackTrace: {ex.StackTrace}");
+            }
             throw;
         }
     }

@@ -1,6 +1,9 @@
 ﻿using System.Diagnostics;
+using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using NativeWifi;
+using WhisperFTPApp.Enums;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Services.Interfaces;
@@ -13,13 +16,22 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
     private readonly WlanClient _client;
     private CancellationTokenSource? _scanCancellationSource;
     private bool _disposed;
+    private readonly SemaphoreSlim _ftpScanSemaphore = new(10);
+    private string? _currentNetwork;
+    private string? _currentIpAddress;
+
+    private readonly Dictionary<string, WifiNetwork> _networkCache = new();
+    private readonly object _networkCacheLock = new();
+    private readonly HashSet<string> _scannedNetworks = new();
 
     public event EventHandler<NetworkFoundEventArgs>? NetworkFound;
     public event EventHandler<NetworkConnectedEventArgs>? NetworkConnected;
+    public event EventHandler<FtpServerFoundEventArgs>? FtpServerFound;
 
     public WifiScannerService()
     {
         _client = new WlanClient();
+        RememberCurrentNetwork();
     }
 
     public async Task<List<WifiNetwork>> ScanNetworksAsync(CancellationToken token)
@@ -31,7 +43,9 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
         _scanCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(token);
         var scanStartTime = Stopwatch.GetTimestamp();
 
-        StaticFileLogger.LogInformation($"Starting WiFi scan at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        StaticFileLogger.LogInformation($"Starting HYBRID WiFi scan at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        StaticFileLogger.LogInformation($"Current network: {_currentNetwork}, IP: {_currentIpAddress}");
+        StaticFileLogger.LogInformation("Mode: Passive WiFi discovery + Active FTP scan (current network only)");
 
         try
         {
@@ -55,53 +69,111 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
                         {
                             if (_scanCancellationSource.Token.IsCancellationRequested) break;
 
-                            var wifiNetwork = new WifiNetwork
-                            {
-                                SSID = NetworkUtils.GetStringForSSID(network.dot11Ssid),
-                                BSSID = NetworkUtils.GetMacAddress(network.dot11Bssid),
-                                SignalStrength = network.rssi,
-                                Channel = NetworkUtils.GetChannelFromFrequency(network.chCenterFrequency),
-                                SecurityType = NetworkUtils.GetSecurityType(wlanIface, network.dot11Ssid),
-                                LastSeen = DateTime.Now,
-                                IpAddress = string.Empty
-                            };
+                            var bssid = NetworkUtils.GetMacAddress(network.dot11Bssid);
+                            var ssid = NetworkUtils.GetStringForSSID(network.dot11Ssid);
 
-                            networks.Add(wifiNetwork);
+                            WifiNetwork wifiNetwork;
+
+                            lock (_networkCacheLock)
+                            {
+                                if (_networkCache.TryGetValue(bssid, out var cachedNetwork))
+                                {
+                                    wifiNetwork = cachedNetwork;
+                                    wifiNetwork.SignalStrength = network.rssi;
+                                    wifiNetwork.LastSeen = DateTime.Now;
+                                }
+                                else
+                                {
+                                    wifiNetwork = new WifiNetwork
+                                    {
+                                        SSID = ssid,
+                                        BSSID = bssid,
+                                        SignalStrength = network.rssi,
+                                        Channel = NetworkUtils.GetChannelFromFrequency(network.chCenterFrequency),
+                                        SecurityType = NetworkUtils.GetSecurityType(wlanIface, network.dot11Ssid),
+                                        LastSeen = DateTime.Now,
+                                        IpAddress = string.Empty,
+                                        ScanStatus = FtpScanStatus.NotScanned
+                                    };
+                                    _networkCache[bssid] = wifiNetwork;
+                                }
+                            }
+
+                            var isCurrentNetwork = wifiNetwork.SSID == _currentNetwork;
+                            if (isCurrentNetwork)
+                            {
+                                wifiNetwork.IsConnected = true;
+                                wifiNetwork.IpAddress = _currentIpAddress ?? string.Empty;
+                            }
+
+                            var existing = networks.FirstOrDefault(n => n.BSSID == wifiNetwork.BSSID);
+                            if (existing != null)
+                            {
+                                var index = networks.IndexOf(existing);
+                                networks[index] = wifiNetwork;
+                            }
+                            else
+                            {
+                                networks.Add(wifiNetwork);
+                            }
+
                             NetworkFound?.Invoke(this, new NetworkFoundEventArgs(wifiNetwork));
+
+                            if (isCurrentNetwork)
+                            {
+                                NetworkConnected?.Invoke(this, new NetworkConnectedEventArgs(wifiNetwork));
+                            }
 
                             StaticFileLogger.LogInformation(
                                 $"Network found: SSID={wifiNetwork.SSID}, " +
                                 $"BSSID={wifiNetwork.BSSID}, " +
                                 $"Signal={wifiNetwork.SignalStrength}dBm, " +
                                 $"Channel={wifiNetwork.Channel}, " +
-                                $"Security={wifiNetwork.SecurityType}");
+                                $"Security={wifiNetwork.SecurityType}, " +
+                                $"Current={isCurrentNetwork}");
 
-                            if (wifiNetwork.SecurityType == "IEEE80211_Open")
+                            var networkCacheKey = $"{wifiNetwork.SSID}_{wifiNetwork.IpAddress}";
+
+                            if (isCurrentNetwork)
                             {
                                 StaticFileLogger.LogInformation(
-                                    $"Attempting to connect to open network: {wifiNetwork.SSID}");
-                                var connected = await ConnectToNetworkAsync(wifiNetwork.SSID).ConfigureAwait(false);
-                                if (connected)
+                                    $"✓ You are connected to network: {wifiNetwork.SSID} (Security: {wifiNetwork.SecurityType})");
+
+                                if (_scannedNetworks.Contains(networkCacheKey))
                                 {
-                                    var adapter = NetworkInterface.GetAllNetworkInterfaces()
-                                        .FirstOrDefault(x => x.OperationalStatus == OperationalStatus.Up);
-
-                                    if (adapter != null)
-                                    {
-                                        var ipAddress = NetworkUtils.GetLocalIPv4(adapter);
-                                        if (!string.IsNullOrEmpty(ipAddress))
-                                        {
-                                            wifiNetwork.IpAddress = ipAddress;
-                                            wifiNetwork.HasOpenFtp = await CheckFtpAccessAsync(ipAddress).ConfigureAwait(false);
-                                            NetworkConnected?.Invoke(this, new NetworkConnectedEventArgs(wifiNetwork));
-
-                                            StaticFileLogger.LogInformation(
-                                                $"Connected to network: {wifiNetwork.SSID}, " +
-                                                $"IP={wifiNetwork.IpAddress}, " +
-                                                $"FTP={(wifiNetwork.HasOpenFtp ? "Open" : "Closed")}");
-                                        }
-                                    }
+                                    StaticFileLogger.LogInformation(
+                                        $"Network {wifiNetwork.SSID} already scanned in this session - skipping FTP scan");
                                 }
+                                else
+                                {
+                                    StaticFileLogger.LogInformation(
+                                        $"Starting FTP scan in YOUR current network...");
+
+                                    _ = Task.Run(async () =>
+                                    {
+                                        try
+                                        {
+                                            await PopulateNetworkInfoAsync(wifiNetwork).ConfigureAwait(false);
+                                            await ScanCurrentNetworkForFtpAsync(wifiNetwork,
+                                                    _scanCancellationSource.Token)
+                                                .ConfigureAwait(false);
+
+                                            _scannedNetworks.Add(networkCacheKey);
+
+                                            NetworkFound?.Invoke(this, new NetworkFoundEventArgs(wifiNetwork));
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            StaticFileLogger.LogError($"FTP scan background error: {ex.Message}");
+                                        }
+                                    }, _scanCancellationSource.Token);
+                                }
+                            }
+                            else if (!isCurrentNetwork && wifiNetwork.SecurityType == "IEEE80211_Open")
+                            {
+                                wifiNetwork.ScanStatus = FtpScanStatus.RequiresConnection;
+                                StaticFileLogger.LogInformation(
+                                    $"Open network detected: {wifiNetwork.SSID} - requires manual connection for FTP scan");
                             }
                         }
                     }
@@ -136,21 +208,389 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
             var scanDuration = Stopwatch.GetElapsedTime(scanStartTime);
             var openNetworks = networks.Count(n => n.SecurityType == "IEEE80211_Open");
             var ftpNetworks = networks.Count(n => n.HasOpenFtp);
+            var requireConnection = networks.Count(n => n.ScanStatus == FtpScanStatus.RequiresConnection);
 
             StaticFileLogger.LogInformation(
-                $"Scan completed in {scanDuration.TotalSeconds:F1} seconds\n" +
+                $"Hybrid scan completed in {scanDuration.TotalSeconds:F1} seconds\n" +
                 $"Total networks found: {networks.Count}\n" +
                 $"Open networks: {openNetworks}\n" +
-                $"Networks with open FTP: {ftpNetworks}");
+                $"Networks with FTP (scanned): {ftpNetworks}\n" +
+                $"Networks requiring connection: {requireConnection}\n" +
+                $"Your connection: {_currentNetwork} (stable)");
         }
 
         return networks;
+    }
+
+    private async Task ScanCurrentNetworkForFtpAsync(WifiNetwork network, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(network.IpAddress))
+        {
+            StaticFileLogger.LogWarning($"No IP address for current network {network.SSID}");
+            return;
+        }
+
+        network.ScanStatus = FtpScanStatus.Scanning;
+        StaticFileLogger.LogInformation(
+            $"Starting FTP scan for YOUR CURRENT network: {network.SSID} ({network.IpAddress})");
+
+        try
+        {
+            var ipParts = network.IpAddress.Split('.');
+            if (ipParts.Length != 4)
+            {
+                StaticFileLogger.LogError($"Invalid IP address format: {network.IpAddress}");
+                network.ScanStatus = FtpScanStatus.Error;
+                return;
+            }
+
+            var baseIP = $"{ipParts[0]}.{ipParts[1]}.{ipParts[2]}.";
+            var scanTasks = new List<Task<FtpServerInfo?>>();
+
+            var priorityIps = new[] { 1, 2, 254, 100 };
+            foreach (var i in priorityIps)
+            {
+                if (token.IsCancellationRequested) break;
+                scanTasks.Add(ScanSingleHostForFtpAsync(baseIP + i, token));
+            }
+
+            var priorityResults = await Task.WhenAll(scanTasks).ConfigureAwait(false);
+            var foundServers = priorityResults.Where(r => r != null).ToList();
+
+            if (foundServers.Count == 0)
+            {
+                StaticFileLogger.LogInformation("Priority IPs scan completed, starting full range scan...");
+                scanTasks.Clear();
+
+                for (int i = 1; i < 255; i++)
+                {
+                    if (token.IsCancellationRequested) break;
+                    if (priorityIps.Contains(i)) continue;
+
+                    var targetIP = baseIP + i;
+                    scanTasks.Add(ScanSingleHostForFtpAsync(targetIP, token));
+                }
+
+                var allResults = await Task.WhenAll(scanTasks).ConfigureAwait(false);
+                foundServers = allResults.Where(r => r != null).ToList();
+            }
+
+            if (foundServers.Count > 0)
+            {
+                network.HasOpenFtp = true;
+                network.ScanStatus = FtpScanStatus.Found;
+                network.ConnectedDevices = foundServers.Count;
+
+                var mainServer = foundServers[0]!;
+                network.FtpServerAddress = mainServer.IpAddress;
+                network.FtpPort = mainServer.Port;
+                network.FtpBanner = mainServer.ServerBanner;
+                network.FtpServerType = mainServer.ServerType;
+                network.FtpRequiresAuth = !mainServer.IsAnonymousAllowed;
+                network.FtpResponseTime = mainServer.ResponseTime;
+
+                StaticFileLogger.LogInformation(
+                    $"✓✓✓ Found {foundServers.Count} FTP server(s) in YOUR network {network.SSID}\n" +
+                    $"Main server: {mainServer.IpAddress}:{mainServer.Port}\n" +
+                    $"Type: {mainServer.ServerType}\n" +
+                    $"Banner: {mainServer.ServerBanner}\n" +
+                    $"Anonymous: {mainServer.IsAnonymousAllowed}\n" +
+                    $"SSL: {mainServer.SupportsSSL}");
+
+                foreach (var server in foundServers)
+                {
+                    FtpServerFound?.Invoke(this, new FtpServerFoundEventArgs(network, server!));
+                }
+            }
+            else
+            {
+                network.ScanStatus = FtpScanStatus.NotFound;
+                StaticFileLogger.LogInformation($"No FTP servers found in your current network {network.SSID}");
+            }
+        }
+        catch (Exception ex)
+        {
+            network.ScanStatus = FtpScanStatus.Error;
+            StaticFileLogger.LogError($"FTP scan error for network {network.SSID}: {ex.Message}");
+        }
+    }
+
+    private async Task<FtpServerInfo?> ScanSingleHostForFtpAsync(
+        string ipAddress,
+        CancellationToken token)
+    {
+        await _ftpScanSemaphore.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            var (isOpen, banner) = await CheckFtpPortDetailedAsync(ipAddress, 21, token)
+                .ConfigureAwait(false);
+
+            if (!isOpen)
+                return null;
+
+            stopwatch.Stop();
+
+            var serverInfo = new FtpServerInfo
+            {
+                IpAddress = ipAddress,
+                Port = 21,
+                ServerBanner = banner,
+                ResponseTime = stopwatch.Elapsed,
+                DiscoveredAt = DateTime.Now
+            };
+
+            serverInfo.ServerType = DetermineServerType(banner);
+            serverInfo.IsAnonymousAllowed = await CheckAnonymousAccessAsync(ipAddress, token)
+                .ConfigureAwait(false);
+            serverInfo.SupportsSSL = await CheckFtpSslSupportAsync(ipAddress, token)
+                .ConfigureAwait(false);
+
+            StaticFileLogger.LogInformation(
+                $"  FTP server detected at {ipAddress}\n" +
+                $"  Type: {serverInfo.ServerType}\n" +
+                $"  Anonymous: {serverInfo.IsAnonymousAllowed}\n" +
+                $"  SSL: {serverInfo.SupportsSSL}\n" +
+                $"  Response time: {serverInfo.ResponseTime.TotalMilliseconds:F0}ms");
+
+            return serverInfo;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+        finally
+        {
+            _ftpScanSemaphore.Release();
+        }
+    }
+
+    private static async Task<(bool isOpen, string? banner)> CheckFtpPortDetailedAsync(
+        string ipAddress,
+        int port,
+        CancellationToken token)
+    {
+        TcpClient? client = null;
+        try
+        {
+            client = new TcpClient();
+
+            using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            connectCts.CancelAfter(1500);
+
+            try
+            {
+                await client.ConnectAsync(ipAddress, port, connectCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return (false, null);
+            }
+            catch (SocketException)
+            {
+                return (false, null);
+            }
+
+            if (!client.Connected)
+                return (false, null);
+
+            using var stream = client.GetStream();
+            using var reader = new StreamReader(stream);
+
+            using var bannerCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            bannerCts.CancelAfter(1000);
+
+            try
+            {
+                string? banner;
+#if NET6_0_OR_GREATER
+                banner = await reader.ReadLineAsync(bannerCts.Token).ConfigureAwait(false);
+#else
+                var readTask = reader.ReadLineAsync();
+                banner = await readTask.ConfigureAwait(false);
+#endif
+                return (true, banner);
+            }
+            catch (OperationCanceledException)
+            {
+                return (true, null);
+            }
+        }
+        catch
+        {
+            return (false, null);
+        }
+        finally
+        {
+            client?.Dispose();
+        }
+    }
+
+#pragma warning disable SYSLIB0014
+    private static async Task<bool> CheckAnonymousAccessAsync(string ipAddress, CancellationToken token)
+    {
+        try
+        {
+            var uri = new Uri($"ftp://{ipAddress}");
+            var request = (FtpWebRequest)WebRequest.Create(uri);
+            request.Method = WebRequestMethods.Ftp.ListDirectory;
+            request.Credentials = new NetworkCredential("anonymous", "anonymous@example.com");
+            request.Timeout = 2000;
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            cts.CancelAfter(2000);
+
+            using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
+            return response.StatusCode == FtpStatusCode.OpeningData ||
+                   response.StatusCode == FtpStatusCode.DataAlreadyOpen;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+#pragma warning restore SYSLIB0014
+
+#pragma warning disable SYSLIB0014
+    private static async Task<bool> CheckFtpSslSupportAsync(string ipAddress, CancellationToken token)
+    {
+        try
+        {
+            var uri = new Uri($"ftp://{ipAddress}");
+            var request = (FtpWebRequest)WebRequest.Create(uri);
+            request.Method = WebRequestMethods.Ftp.ListDirectory;
+            request.EnableSsl = true;
+            request.Timeout = 1500;
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            cts.CancelAfter(1500);
+
+            using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+#pragma warning restore SYSLIB0014
+
+    private static string DetermineServerType(string? banner)
+    {
+        if (string.IsNullOrEmpty(banner))
+            return "Unknown";
+
+        banner = banner.ToUpperInvariant();
+
+        if (banner.Contains("FILEZILLA", StringComparison.OrdinalIgnoreCase)) return "FileZilla Server";
+        if (banner.Contains("PROFTPD", StringComparison.OrdinalIgnoreCase)) return "ProFTPD";
+        if (banner.Contains("VSFTPD", StringComparison.OrdinalIgnoreCase)) return "vsftpd";
+        if (banner.Contains("PURE-FTPD", StringComparison.OrdinalIgnoreCase)) return "Pure-FTPd";
+        if (banner.Contains("MICROSOFT", StringComparison.OrdinalIgnoreCase)) return "Microsoft IIS FTP";
+        if (banner.Contains("SERV-U", StringComparison.OrdinalIgnoreCase)) return "Serv-U FTP";
+        if (banner.Contains("WU-FTPD", StringComparison.OrdinalIgnoreCase)) return "WU-FTPD";
+        if (banner.Contains("OPENSSH", StringComparison.OrdinalIgnoreCase)) return "OpenSSH SFTP";
+
+        return "Generic FTP Server";
+    }
+
+    private void RememberCurrentNetwork()
+    {
+        try
+        {
+            foreach (WlanClient.WlanInterface wlanIface in _client.Interfaces)
+            {
+                if (wlanIface.InterfaceState == Wlan.WlanInterfaceState.Connected)
+                {
+                    _currentNetwork = NetworkUtils.GetStringForSSID(
+                        wlanIface.CurrentConnection.wlanAssociationAttributes.dot11Ssid);
+
+                    var adapter = NetworkInterface.GetAllNetworkInterfaces()
+                        .FirstOrDefault(x => x.OperationalStatus == OperationalStatus.Up &&
+                                             x.NetworkInterfaceType == NetworkInterfaceType.Wireless80211);
+
+                    if (adapter != null)
+                    {
+                        _currentIpAddress = NetworkUtils.GetLocalIPv4(adapter);
+                    }
+
+                    StaticFileLogger.LogInformation(
+                        $"Current network remembered: {_currentNetwork}, IP: {_currentIpAddress}");
+                    break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Failed to remember current network: {ex.Message}");
+        }
+    }
+
+    private static async Task PopulateNetworkInfoAsync(WifiNetwork network)
+    {
+        try
+        {
+            var adapter = NetworkInterface.GetAllNetworkInterfaces()
+                .FirstOrDefault(x => x.OperationalStatus == OperationalStatus.Up &&
+                                     x.NetworkInterfaceType == NetworkInterfaceType.Wireless80211);
+
+            if (adapter != null)
+            {
+                network.IpAddress = NetworkUtils.GetLocalIPv4(adapter)!;
+
+                var ipProps = adapter.GetIPProperties();
+
+                var gateway = ipProps.GatewayAddresses.FirstOrDefault();
+                if (gateway != null)
+                {
+                    network.Gateway = gateway.Address.ToString();
+                }
+
+                var unicast = ipProps.UnicastAddresses
+                    .FirstOrDefault(addr => addr.Address.AddressFamily == AddressFamily.InterNetwork);
+                if (unicast != null)
+                {
+                    network.SubnetMask = unicast.IPv4Mask.ToString();
+                }
+
+                network.Speed = DetermineNetworkSpeed(adapter.Speed);
+
+                StaticFileLogger.LogInformation(
+                    $"Network info - IP: {network.IpAddress}, " +
+                    $"Gateway: {network.Gateway}, " +
+                    $"Speed: {network.Speed}");
+            }
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Failed to populate network info: {ex.Message}");
+        }
+
+        await Task.CompletedTask.ConfigureAwait(false);
+    }
+
+    private static NetworkSpeed DetermineNetworkSpeed(long speedBps)
+    {
+        var speedMbps = speedBps / 1_000_000.0;
+
+        return speedMbps switch
+        {
+            < 1 => NetworkSpeed.Slow,
+            < 10 => NetworkSpeed.Medium,
+            < 100 => NetworkSpeed.Fast,
+            _ => NetworkSpeed.VeryFast
+        };
     }
 
     public async Task<bool> ConnectToNetworkAsync(string ssid)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(ssid);
+
+        StaticFileLogger.LogWarning(
+            $"Manual connection requested to network: {ssid}\n" +
+            $"This will disconnect from current network: {_currentNetwork}");
 
         try
         {
@@ -168,11 +608,19 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
                     var bssType = Wlan.Dot11BssType.Infrastructure;
 
                     wlanIface.Connect(connectionMode, bssType, profileName);
-                    await Task.Delay(2000).ConfigureAwait(false);
+                    await Task.Delay(3000).ConfigureAwait(false);
 
-                    return wlanIface.InterfaceState == Wlan.WlanInterfaceState.Connected &&
-                           NetworkUtils.GetStringForSSID(
-                               wlanIface.CurrentConnection.wlanAssociationAttributes.dot11Ssid) == ssid;
+                    var connected = wlanIface.InterfaceState == Wlan.WlanInterfaceState.Connected &&
+                                    NetworkUtils.GetStringForSSID(
+                                        wlanIface.CurrentConnection.wlanAssociationAttributes.dot11Ssid) == ssid;
+
+                    if (connected)
+                    {
+                        StaticFileLogger.LogInformation($"✓ Successfully connected to {ssid}");
+                        RememberCurrentNetwork();
+                    }
+
+                    return connected;
                 }
             }
         }
@@ -184,39 +632,11 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
         return false;
     }
 
+    [Obsolete("Use ScanCurrentNetworkForFtpAsync instead")]
     public Task<bool> CheckFtpAccessAsync(string ipAddress)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(ipAddress);
-
-        if (string.IsNullOrEmpty(ipAddress))
-            return Task.FromResult(false);
-
-        try
-        {
-            var ipParts = ipAddress.Split('.');
-            if (ipParts.Length != 4)
-                return Task.FromResult(false);
-
-            var baseIP = $"{ipParts[0]}.{ipParts[1]}.{ipParts[2]}.";
-
-            for (int i = 1; i < 255; i++)
-            {
-                var targetIP = baseIP + i;
-                var (isOpen, _) = NetworkUtils.CheckFtpPort(targetIP);
-
-                if (isOpen)
-                {
-                    StaticFileLogger.LogInformation($"Found open FTP port at: {targetIP}");
-                    return Task.FromResult(true);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            StaticFileLogger.LogError($"FTP scan error for {ipAddress}: {ex.Message}");
-        }
-
         return Task.FromResult(false);
     }
 
@@ -227,9 +647,20 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
         _scanCancellationSource?.Cancel();
     }
 
+    public void ClearScanCache()
+    {
+        _scannedNetworks.Clear();
+        lock (_networkCacheLock)
+        {
+            _networkCache.Clear();
+        }
+        StaticFileLogger.LogInformation("Scan cache cleared");
+    }
+
     public void Dispose()
     {
         Dispose(true);
+        GC.SuppressFinalize(this);
     }
 
     private void Dispose(bool disposing)
@@ -241,6 +672,12 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
             StopScan();
             _scanCancellationSource?.Dispose();
             _scanCancellationSource = null;
+            _ftpScanSemaphore?.Dispose();
+            _scannedNetworks.Clear();
+            lock (_networkCacheLock)
+            {
+                _networkCache.Clear();
+            }
         }
 
         _disposed = true;

@@ -6,14 +6,12 @@ namespace WhisperFTPApp.Logger;
 internal static class StaticFileLogger
 {
     private static readonly Lazy<string> _filePath = new(() => PathManager.GetLogFilePath());
-
     private static readonly object _lock = new();
 
-    public static bool IsEnabled { get; set; } = true;
-
+    private static bool IsEnabled { get; set; } = true;
     public static string LogFolderPath => PathManager.AppDataDirectory;
 
-    public static void Log(LogLevel logLevel, string message)
+    private static void Log(LogLevel logLevel, string message)
     {
         if (!IsEnabled || logLevel == LogLevel.None) return;
 
@@ -25,6 +23,6 @@ internal static class StaticFileLogger
     }
 
     public static void LogInformation(string message) => Log(LogLevel.Information, message);
-
     public static void LogError(string message) => Log(LogLevel.Error, message);
+    public static void LogWarning(string message) => Log(LogLevel.Warning, message);
 }

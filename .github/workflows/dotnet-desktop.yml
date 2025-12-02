@@ -13,7 +13,8 @@ env:
     DOTNET_VERSION: '9.0.x'
     SOLUTION_NAME: 'WhisperFTPApp.sln'
     PROJECT_PATH: 'WhisperFTPApp/WhisperFTPApp.csproj'
-    ARTIFACT_NAME: 'WhisperFTPApp'
+    ARTIFACT_NAME: 'AzioWhisperFTP'
+    EXE_NAME: 'AzioWhisperFTP.exe'
 
 jobs:
     # ============================================
@@ -146,7 +147,7 @@ jobs:
                   if ("${{ github.ref }}" -match "refs/tags/v(.*)") {
                     $version = $matches[1]
                   } else {
-                    $version = "1.1.0-dev.${{ github.run_number }}"
+                    $version = "1.2.0-dev.${{ github.run_number }}"
                   }
                   echo "version=$version" >> $env:GITHUB_OUTPUT
                   echo "Version: $version"
@@ -176,7 +177,7 @@ jobs:
             - name: Get file size
               id: filesize
               run: |
-                  $exePath = "./publish/win-x64/WhisperFTPApp.exe"
+                  $exePath = "./publish/win-x64/${{ env.EXE_NAME }}"
                   if (Test-Path $exePath) {
                     $sizeBytes = (Get-Item $exePath).Length
                     $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
@@ -184,6 +185,7 @@ jobs:
                     echo "Executable size: $sizeMB MB"
                   } else {
                     echo "size_mb=Unknown" >> $env:GITHUB_OUTPUT
+                    echo "Warning: ${{ env.EXE_NAME }} not found!"
                   }
 
             - name: Create ZIP archive
@@ -218,9 +220,11 @@ jobs:
                   $buildInfo = @"
                   Build Information
                   =================
+                  Application: AzioWhisper FTP
                   Version: ${{ steps.version.outputs.version }}
                   Configuration: Release (ReadyToRun without Trimming)
                   Runtime: win-x64 (self-contained)
+                  Executable: ${{ env.EXE_NAME }}
                   Executable Size: ${{ steps.filesize.outputs.size_mb }} MB
                   ZIP Size: ${{ steps.hash.outputs.zip_size_mb }} MB
                   SHA256: ${{ steps.hash.outputs.sha256 }}
@@ -271,23 +275,23 @@ jobs:
               run: |
                   $version = "${{ steps.version.outputs.version }}"
                   $notes = @"
-                  # WhisperFTPApp $version
+                  # AzioWhisper FTP $version
 
-                  ## 📦 Downloads
+                  ## Downloads
 
                   **Windows x64 (64-bit Intel/AMD)**
                   - Self-contained build (no .NET Runtime required)
                   - Single executable file with ReadyToRun compilation
                   - Optimized for fast startup
 
-                  ## 🚀 Installation
+                  ## Installation
 
                   1. Download the ZIP file below
                   2. Extract to any folder
-                  3. Run ``WhisperFTPApp.exe``
+                  3. Run ``AzioWhisperFTP.exe``
                   4. Configure your FTP connection settings
 
-                  ## ✨ Features
+                  ## Features
 
                   - **FTP File Management**: Seamless file transfer operations
                   - **Modern UI**: Built with Avalonia UI and Fluent theme
@@ -295,13 +299,11 @@ jobs:
                   - **Data Persistence**: SQLite database with Entity Framework Core
                   - **Localization**: Multi-language support (English, Russian)
 
-                  ## 📋 Requirements
+                  ## Requirements
 
                   - **OS**: Windows 11
                   - **Architecture**: x64 (64-bit)
                   - **.NET Runtime**: Not required (self-contained)
-                  - **Disk Space**: ~100 MB
-                  - **RAM**: 256 MB minimum, 512 MB recommended
 
                   ## ⚡ Performance
 
@@ -312,12 +314,12 @@ jobs:
                   - ✅ Tiered compilation enabled
                   - ✅ Single-file deployment
 
-                  ## 🔒 Security
+                  ## Security
 
                   - **SHA256 Checksum**: Available in artifact details
                   - Verify the hash after download to ensure file integrity
 
-                  ## 🐛 Known Issues & Troubleshooting
+                  ## Known Issues & Troubleshooting
 
                   - Ensure proper FTP server credentials
                   - Check firewall settings for FTP connections
@@ -325,7 +327,7 @@ jobs:
 
                   ---
 
-                  **Full Changelog**: https://github.com/${{ github.repository }}/compare/v1.0.0...$version
+                  **Full Changelog**: https://github.com/${{ github.repository }}/compare/v1.1.0...$version
                   **Documentation**: https://github.com/${{ github.repository }}/blob/master/README.md
                   "@
 
@@ -370,10 +372,10 @@ jobs:
                   Write-Output $output
 
                   if ($output -match "has the following vulnerable packages") {
-                    Write-Error "❌ Vulnerable packages detected!"
+                    Write-Error "Vulnerable packages detected!"
                     exit 1
                   } else {
-                    Write-Output "✅ No vulnerable packages found"
+                    Write-Output "No vulnerable packages found"
                   }
               continue-on-error: true
 

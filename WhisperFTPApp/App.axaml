@@ -9,11 +9,11 @@
              <Application.DataTemplates>
                  <local:ViewLocator/>
              </Application.DataTemplates>
-  
+
              <Application.Styles>
                  <FluentTheme />
              </Application.Styles>
-             
+
     <Application.Resources>
         <ResourceDictionary>
         <converters:FtpTypeConverter x:Key="TypeConverter" />
@@ -23,6 +23,10 @@
         <converters:WindowBackgroundConverter x:Key="WindowBackgroundConverter" />
         <converters:FtpRowStyleClassConverter x:Key="FtpRowStyleClassConverter" />
         <converters:FtpStatusConverter x:Key="FtpStatusConverter" />
+        <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" />
+        <converters:TimeSpanToMillisecondsConverter x:Key="TimeSpanToMillisecondsConverter" />
+        <converters:ScanStatusColorConverter x:Key="ScanStatusColorConverter" />
+
         <StreamGeometry x:Key="MainViewIcon">M3,4H21V8H3V4M3,10H21V14H3V10M3,16H21V20H3V16Z</StreamGeometry>
         <StreamGeometry x:Key="ScanIcon">M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4C16.42 4 20 7.58 20 12C20 16.42 16.42 20 12 20ZM7 15L11.5 10.5L13.5 12.5L17 9L19 11V7H15L17 9L13.5 12.5L11.5 10.5L7 15Z</StreamGeometry>        <StreamGeometry x:Key="SettingsIcon">M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z</StreamGeometry>
         <StreamGeometry x:Key="ListOfConnections">M5,13H19V11H5M3,17H17V15H3M7,7V9H21V7</StreamGeometry>
@@ -35,8 +39,7 @@
         <StreamGeometry x:Key="RefreshIcon">M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z</StreamGeometry>
         <StreamGeometry x:Key="FolderIcon">M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z</StreamGeometry>
         <StreamGeometry x:Key="StopIcon">M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4 14H8V8h8v8z</StreamGeometry>
-        
-        
+
         <x:String x:Key="Image1">/Assets/Image (1).jpg</x:String>
         <x:String x:Key="Image2">/Assets/Image (2).jpg</x:String>
         <x:String x:Key="Image3">/Assets/Image (3).jpg</x:String>
