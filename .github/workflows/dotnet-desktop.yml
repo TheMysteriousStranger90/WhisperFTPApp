@@ -305,14 +305,14 @@ jobs:
                   - **Architecture**: x64 (64-bit)
                   - **.NET Runtime**: Not required (self-contained)
 
-                  ## ⚡ Performance
+                  ## Performance
 
                   This build uses optimized configuration:
-                  - ✅ ReadyToRun compilation for 30-40% faster startup
-                  - ✅ No trimming = full compatibility
-                  - ✅ Server GC for better performance
-                  - ✅ Tiered compilation enabled
-                  - ✅ Single-file deployment
+                  - ReadyToRun compilation for 30-40% faster startup
+                  - No trimming = full compatibility
+                  - Server GC for better performance
+                  - Tiered compilation enabled
+                  - Single-file deployment
 
                   ## Security
 
