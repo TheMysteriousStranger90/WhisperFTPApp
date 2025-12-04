@@ -23,6 +23,7 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
     private readonly Dictionary<string, WifiNetwork> _networkCache = new();
     private readonly object _networkCacheLock = new();
     private readonly HashSet<string> _scannedNetworks = new();
+    private readonly List<Task> _backgroundTasks = new();
 
     public event EventHandler<NetworkFoundEventArgs>? NetworkFound;
     public event EventHandler<NetworkConnectedEventArgs>? NetworkConnected;
@@ -42,6 +43,8 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
         _scanCancellationSource?.Dispose();
         _scanCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(token);
         var scanStartTime = Stopwatch.GetTimestamp();
+
+        _backgroundTasks.Clear();
 
         StaticFileLogger.LogInformation($"Starting HYBRID WiFi scan at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         StaticFileLogger.LogInformation($"Current network: {_currentNetwork}, IP: {_currentIpAddress}");
@@ -143,31 +146,36 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
                                 {
                                     StaticFileLogger.LogInformation(
                                         $"Network {wifiNetwork.SSID} already scanned in this session - skipping FTP scan");
+                                    continue;
                                 }
-                                else
+
+                                StaticFileLogger.LogInformation(
+                                    $"Starting FTP scan in YOUR current network...");
+
+                                _scannedNetworks.Add(networkCacheKey);
+
+                                var bgTask = Task.Run(async () =>
                                 {
-                                    StaticFileLogger.LogInformation(
-                                        $"Starting FTP scan in YOUR current network...");
-
-                                    _ = Task.Run(async () =>
+                                    try
                                     {
-                                        try
-                                        {
-                                            await PopulateNetworkInfoAsync(wifiNetwork).ConfigureAwait(false);
-                                            await ScanCurrentNetworkForFtpAsync(wifiNetwork,
-                                                    _scanCancellationSource.Token)
-                                                .ConfigureAwait(false);
+                                        await PopulateNetworkInfoAsync(wifiNetwork).ConfigureAwait(false);
+                                        await ScanCurrentNetworkForFtpAsync(wifiNetwork,
+                                                _scanCancellationSource.Token)
+                                            .ConfigureAwait(false);
 
-                                            _scannedNetworks.Add(networkCacheKey);
+                                        NetworkFound?.Invoke(this, new NetworkFoundEventArgs(wifiNetwork));
+                                    }
+                                    catch (OperationCanceledException)
+                                    {
+                                        StaticFileLogger.LogInformation($"FTP scan cancelled for {wifiNetwork.SSID}");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        StaticFileLogger.LogError($"FTP scan background error: {ex.Message}");
+                                    }
+                                }, _scanCancellationSource.Token);
 
-                                            NetworkFound?.Invoke(this, new NetworkFoundEventArgs(wifiNetwork));
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            StaticFileLogger.LogError($"FTP scan background error: {ex.Message}");
-                                        }
-                                    }, _scanCancellationSource.Token);
-                                }
+                                _backgroundTasks.Add(bgTask);
                             }
                             else if (!isCurrentNetwork && wifiNetwork.SecurityType == "IEEE80211_Open")
                             {
@@ -180,6 +188,7 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
                     catch (OperationCanceledException)
                     {
                         StaticFileLogger.LogInformation("Scan cancelled by user");
+                        await WaitForBackgroundTasksAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
                         return networks;
                     }
                     catch (Exception ex)
@@ -197,6 +206,7 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
         catch (OperationCanceledException)
         {
             StaticFileLogger.LogInformation("Scan cancelled by user");
+            await WaitForBackgroundTasksAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -220,6 +230,23 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
         }
 
         return networks;
+    }
+
+    private async Task WaitForBackgroundTasksAsync(TimeSpan timeout)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(timeout);
+            await Task.WhenAll(_backgroundTasks).WaitAsync(cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            StaticFileLogger.LogWarning("Background tasks did not complete within timeout");
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Error waiting for background tasks: {ex.Message}");
+        }
     }
 
     private async Task ScanCurrentNetworkForFtpAsync(WifiNetwork network, CancellationToken token)
@@ -247,7 +274,7 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
             var baseIP = $"{ipParts[0]}.{ipParts[1]}.{ipParts[2]}.";
             var scanTasks = new List<Task<FtpServerInfo?>>();
 
-            var priorityIps = new[] { 1, 2, 254, 100 };
+            var priorityIps = new[] { 1, 2, 254, 100, 200, 192, 168, 10, 20, 50 };
             foreach (var i in priorityIps)
             {
                 if (token.IsCancellationRequested) break;
@@ -308,6 +335,11 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
                 StaticFileLogger.LogInformation($"No FTP servers found in your current network {network.SSID}");
             }
         }
+        catch (OperationCanceledException)
+        {
+            network.ScanStatus = FtpScanStatus.NotScanned;
+            throw;
+        }
         catch (Exception ex)
         {
             network.ScanStatus = FtpScanStatus.Error;
@@ -319,7 +351,15 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
         string ipAddress,
         CancellationToken token)
     {
-        await _ftpScanSemaphore.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            await _ftpScanSemaphore.WaitAsync(token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+
         try
         {
             var stopwatch = Stopwatch.StartNew();
@@ -356,6 +396,10 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
 
             return serverInfo;
         }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
         catch (Exception)
         {
             return null;
@@ -377,7 +421,7 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
             client = new TcpClient();
 
             using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            connectCts.CancelAfter(1500);
+            connectCts.CancelAfter(800);
 
             try
             {
@@ -399,7 +443,7 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
             using var reader = new StreamReader(stream);
 
             using var bannerCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            bannerCts.CancelAfter(1000);
+            bannerCts.CancelAfter(500);
 
             try
             {
@@ -427,19 +471,18 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
         }
     }
 
-#pragma warning disable SYSLIB0014
+    #pragma warning disable SYSLIB0014
     private static async Task<bool> CheckAnonymousAccessAsync(string ipAddress, CancellationToken token)
     {
         try
         {
+            if (token.IsCancellationRequested) return false;
+
             var uri = new Uri($"ftp://{ipAddress}");
             var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.ListDirectory;
             request.Credentials = new NetworkCredential("anonymous", "anonymous@example.com");
             request.Timeout = 2000;
-
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            cts.CancelAfter(2000);
 
             using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
             return response.StatusCode == FtpStatusCode.OpeningData ||
@@ -450,21 +493,20 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
             return false;
         }
     }
-#pragma warning restore SYSLIB0014
+    #pragma warning restore SYSLIB0014
 
-#pragma warning disable SYSLIB0014
+    #pragma warning disable SYSLIB0014
     private static async Task<bool> CheckFtpSslSupportAsync(string ipAddress, CancellationToken token)
     {
         try
         {
+            if (token.IsCancellationRequested) return false;
+
             var uri = new Uri($"ftp://{ipAddress}");
             var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.ListDirectory;
             request.EnableSsl = true;
             request.Timeout = 1500;
-
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            cts.CancelAfter(1500);
 
             using var response = (FtpWebResponse)await request.GetResponseAsync().ConfigureAwait(false);
             return true;
@@ -474,7 +516,7 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
             return false;
         }
     }
-#pragma warning restore SYSLIB0014
+    #pragma warning restore SYSLIB0014
 
     private static string DetermineServerType(string? banner)
     {
@@ -654,6 +696,7 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
         {
             _networkCache.Clear();
         }
+        _backgroundTasks.Clear();
         StaticFileLogger.LogInformation("Scan cache cleared");
     }
 
@@ -674,6 +717,7 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
             _scanCancellationSource = null;
             _ftpScanSemaphore?.Dispose();
             _scannedNetworks.Clear();
+            _backgroundTasks.Clear();
             lock (_networkCacheLock)
             {
                 _networkCache.Clear();
