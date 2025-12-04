@@ -14,10 +14,13 @@ AzioWhisper FTP is app designed for seamless file management and transfer operat
 - **Multi-Selection** - Select and transfer multiple files at once
 
 ### FTP Operations
-- **Full FTP/FTPS Support** - Secure and standard FTP connections
+- **Full FTP/FTPS Support** - Secure and standard FTP connections powered by FluentFTP
+- **Advanced Protocol Support** - Reliable FTP/FTPS connectivity with automatic fallback
 - **Resume Transfers** - Continue interrupted downloads/uploads
 - **Recursive Operations** - Upload/download entire directory trees
 - **Progress Tracking** - Real-time transfer progress indicators
+- **Intelligent Retry** - Automatic retry mechanism for failed operations
+- **Connection Pooling** - Efficient connection management for better performance
 
 ### Network Scanner
 - **Hybrid Scan Mode** - Passive WiFi discovery + Active FTP scanning
@@ -70,6 +73,7 @@ AzioWhisper FTP stores all application data in your Documents folder for easy ac
 | **Framework** | .NET 9.0 |
 | **UI Framework** | Avalonia UI 11.x |
 | **Architecture** | MVVM Pattern |
+| **FTP Client** | FluentFTP |
 | **Reactive Programming** | ReactiveUI + System.Reactive |
 | **Database** | SQLite + Entity Framework Core |
 | **Networking** | Native WiFi API (ManagedWifi) |
