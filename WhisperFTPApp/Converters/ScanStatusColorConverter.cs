@@ -5,7 +5,7 @@ using WhisperFTPApp.Enums;
 
 namespace WhisperFTPApp.Converters;
 
-public class ScanStatusColorConverter : IMultiValueConverter
+internal sealed class ScanStatusColorConverter : IMultiValueConverter
 {
     public static readonly ScanStatusColorConverter Instance = new();
 

@@ -19,19 +19,14 @@ namespace WhisperFTPApp.ViewModels;
 
 public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 {
-    private readonly LocalizationService _localizationService;
     private readonly ISettingsService _settingsService;
     private readonly IFtpService _ftpService;
-    private readonly IBackgroundService _backgroundService;
 
     private string _selectedPath = string.Empty;
     private string _ftpAddress = string.Empty;
     private string _username = string.Empty;
     private string _password = string.Empty;
-    private ObservableCollection<string> _localFiles = new();
-    private ObservableCollection<string> _ftpFiles = new();
     private ObservableCollection<FileSystemItem> _ftpItems = new();
-    public ObservableCollection<string>? DriveNames { get; private set; }
     private double _transferProgress;
     private string _statusMessage = string.Empty;
     private string _currentDirectory = "/";
@@ -256,18 +251,6 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _localItems, value);
     }
 
-    public ObservableCollection<string> LocalFiles
-    {
-        get => _localFiles;
-        private set => this.RaiseAndSetIfChanged(ref _localFiles, value);
-    }
-
-    public ObservableCollection<string> FtpFiles
-    {
-        get => _ftpFiles;
-        private set => this.RaiseAndSetIfChanged(ref _ftpFiles, value);
-    }
-
     public ObservableCollection<FileSystemItem> FtpItems
     {
         get => _ftpItems;
@@ -337,10 +320,9 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         ArgumentNullException.ThrowIfNull(backgroundService);
         ArgumentNullException.ThrowIfNull(scannerService);
 
-        _localizationService = LocalizationService.Instance;
+        var localizationService = LocalizationService.Instance;
         _settingsService = settingsService;
         _ftpService = ftpService;
-        _backgroundService = backgroundService;
 
         NavigateCommand = ReactiveCommand.CreateFromTask<NavigationItem>(NavigateToItemAsync);
         NavigateUpCommand = ReactiveCommand.CreateFromTask(NavigateUpAsync);
@@ -382,7 +364,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             DataContext = new SettingsWindowViewModel(
                 settingsService,
                 backgroundService,
-                _localizationService)
+                localizationService)
         };
         var scanView = new ScanView { DataContext = new ScanWindowViewModel(scannerService) };
 
@@ -408,7 +390,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         });
 
         BackgroundPath = backgroundService.CurrentBackground;
-        _backgroundService.BackgroundChanged.Subscribe(path => BackgroundPath = path);
+        backgroundService.BackgroundChanged.Subscribe(path => BackgroundPath = path);
 
         _ = LoadRecentConnectionsAsync();
         InitializeLocalNavigation();
@@ -455,12 +437,8 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         {
             var selectedPath = folders[0].Path.LocalPath;
             SelectedPath = selectedPath;
-            var files = Directory.GetFiles(selectedPath);
-            _localFiles.Clear();
-            foreach (var file in files)
-            {
-                _localFiles.Add(file);
-            }
+            LocalCurrentPath = selectedPath;
+            await RefreshLocalFiles().ConfigureAwait(false);
         }
     }
 

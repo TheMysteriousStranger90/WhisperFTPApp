@@ -3,7 +3,7 @@ using Avalonia.Data.Converters;
 
 namespace WhisperFTPApp.Converters;
 
-public class TimeSpanToMillisecondsConverter : IValueConverter
+internal sealed class TimeSpanToMillisecondsConverter : IValueConverter
 {
     public static readonly TimeSpanToMillisecondsConverter Instance = new();
 

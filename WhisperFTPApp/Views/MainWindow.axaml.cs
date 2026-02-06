@@ -6,9 +6,13 @@ namespace WhisperFTPApp.Views;
 
 public partial class MainWindow : Window
 {
-    public MainWindow(MainWindowViewModel viewModel)
+    public MainWindow()
     {
         InitializeComponent();
+    }
+
+    public MainWindow(MainWindowViewModel viewModel) : this()
+    {
         DataContext = viewModel;
     }
 

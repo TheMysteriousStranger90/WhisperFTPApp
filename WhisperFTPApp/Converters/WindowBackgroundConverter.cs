@@ -6,10 +6,12 @@ using Avalonia.Platform;
 
 namespace WhisperFTPApp.Converters;
 
-public sealed class WindowBackgroundConverter : IValueConverter
+internal sealed class WindowBackgroundConverter : IValueConverter
 {
     public static readonly WindowBackgroundConverter Instance = new();
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "ImageBrush takes ownership of the Bitmap and will dispose it")]
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is string path)
@@ -20,13 +22,15 @@ public sealed class WindowBackgroundConverter : IValueConverter
                 {
                     var uri = new Uri(path);
                     var stream = AssetLoader.Open(uri);
-                    return new ImageBrush(new Bitmap(stream))
+                    var bitmap = new Bitmap(stream);
+                    return new ImageBrush(bitmap)
                     {
                         Stretch = Stretch.UniformToFill
                     };
                 }
 
-                return new ImageBrush(new Bitmap(path))
+                var fileBitmap = new Bitmap(path);
+                return new ImageBrush(fileBitmap)
                 {
                     Stretch = Stretch.UniformToFill
                 };
@@ -41,6 +45,8 @@ public sealed class WindowBackgroundConverter : IValueConverter
         return null;
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "ImageBrush takes ownership of the Bitmap and will dispose it")]
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         throw new NotImplementedException();
