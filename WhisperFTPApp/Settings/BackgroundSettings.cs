@@ -1,14 +1,16 @@
-﻿namespace WhisperFTPApp.Settings;
+﻿using WhisperFTPApp.Constants;
+
+namespace WhisperFTPApp.Settings;
 
 public class BackgroundSettings
 {
-    public string SelectedBackground { get; set; } = "avares://AzioWhisperFTP/Assets/Image (3).jpg";
+    public string SelectedBackground { get; set; } = AppConstants.DefaultBackground;
 
     public IReadOnlyList<string> AvailableBackgrounds { get; } = new List<string>
     {
-        "avares://AzioWhisperFTP/Assets/Image (1).jpg",
-        "avares://AzioWhisperFTP/Assets/Image (2).jpg",
-        "avares://AzioWhisperFTP/Assets/Image (3).jpg",
-        "avares://AzioWhisperFTP/Assets/Image (4).jpg"
+        $"{AppConstants.AvaresPrefix}/Assets/Image (1).jpg",
+        $"{AppConstants.AvaresPrefix}/Assets/Image (2).jpg",
+        $"{AppConstants.AvaresPrefix}/Assets/Image (3).jpg",
+        $"{AppConstants.AvaresPrefix}/Assets/Image (4).jpg"
     };
 }

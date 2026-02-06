@@ -1,25 +1,24 @@
 ﻿using System.Globalization;
 using Avalonia.Data.Converters;
-using WhisperFTPApp.Helpers;
 
 namespace WhisperFTPApp.Converters;
 
-internal sealed class FileSizeConverter : IValueConverter
+internal sealed class InverseBoolConverter : IValueConverter
 {
-    public static FileSizeConverter Instance { get; } = new();
+    public static InverseBoolConverter Instance { get; } = new();
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        if (value is long size)
+        if (value is bool boolValue)
         {
-            return FileHelper.FormatFileSize(size);
+            return !boolValue;
         }
 
-        return "0 B";
+        return false;
     }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        throw new NotSupportedException();
+        return Convert(value, targetType, parameter, culture);
     }
 }

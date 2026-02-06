@@ -1,21 +1,18 @@
 ﻿using System.Globalization;
 using Avalonia.Data.Converters;
-using WhisperFTPApp.Helpers;
 
 namespace WhisperFTPApp.Converters;
 
-internal sealed class FileSizeConverter : IValueConverter
+internal sealed class NullToBoolConverter : IValueConverter
 {
-    public static FileSizeConverter Instance { get; } = new();
+    public static NullToBoolConverter Instance { get; } = new();
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        if (value is long size)
-        {
-            return FileHelper.FormatFileSize(size);
-        }
+        var invert = parameter?.ToString()?.Equals("Invert", StringComparison.OrdinalIgnoreCase) == true;
+        var isNull = value == null;
 
-        return "0 B";
+        return invert ? isNull : !isNull;
     }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

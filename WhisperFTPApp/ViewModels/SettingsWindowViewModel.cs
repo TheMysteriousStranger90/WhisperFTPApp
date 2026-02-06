@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Reactive;
 using ReactiveUI;
+using WhisperFTPApp.Constants;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Services;
 using WhisperFTPApp.Services.Interfaces;
@@ -44,11 +45,14 @@ internal sealed class SettingsWindowViewModel : ReactiveObject
         set
         {
             this.RaiseAndSetIfChanged(ref _selectedBackground, value);
-            _ = _backgroundService.ChangeBackgroundAsync(value);
+            _ = ChangeBackgroundAsync(value);
         }
     }
 
-    public SettingsWindowViewModel(ISettingsService settingsService, IBackgroundService backgroundService, LocalizationService localizationService)
+    public SettingsWindowViewModel(
+        ISettingsService settingsService,
+        IBackgroundService backgroundService,
+        LocalizationService localizationService)
     {
         ArgumentNullException.ThrowIfNull(settingsService);
         ArgumentNullException.ThrowIfNull(backgroundService);
@@ -80,5 +84,17 @@ internal sealed class SettingsWindowViewModel : ReactiveObject
         ];
         _selectedLanguage = AvailableLanguages.First(l =>
             l.Name == Thread.CurrentThread.CurrentUICulture.Name);
+    }
+
+    private async Task ChangeBackgroundAsync(string path)
+    {
+        try
+        {
+            await _backgroundService.ChangeBackgroundAsync(path).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Error changing background: {ex.Message}");
+        }
     }
 }

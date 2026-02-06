@@ -1,18 +1,68 @@
 ﻿using System.Collections.ObjectModel;
+using ReactiveUI;
 
 namespace WhisperFTPApp.Models;
 
-public sealed class FileSystemItem
+public sealed class FileSystemItem : ReactiveObject
 {
-    public string Name { get; set; } = string.Empty;
-    public string FullPath { get; set; } = string.Empty;
-    public bool IsDirectory { get; set; }
-    public long Size { get; set; }
-    public DateTime Modified { get; set; }
-    public string Type { get; set; } = string.Empty;
-    public FileSystemItem? Parent { get; set; }
+    private string _name = string.Empty;
+    private string _fullPath = string.Empty;
+    private bool _isDirectory;
+    private long _size;
+    private DateTime _modified;
+    private string _type = string.Empty;
+    private FileSystemItem? _parent;
+    private bool _isSelected;
+
+    public string Name
+    {
+        get => _name;
+        set => this.RaiseAndSetIfChanged(ref _name, value);
+    }
+
+    public string FullPath
+    {
+        get => _fullPath;
+        set => this.RaiseAndSetIfChanged(ref _fullPath, value);
+    }
+
+    public bool IsDirectory
+    {
+        get => _isDirectory;
+        set => this.RaiseAndSetIfChanged(ref _isDirectory, value);
+    }
+
+    public long Size
+    {
+        get => _size;
+        set => this.RaiseAndSetIfChanged(ref _size, value);
+    }
+
+    public DateTime Modified
+    {
+        get => _modified;
+        set => this.RaiseAndSetIfChanged(ref _modified, value);
+    }
+
+    public string Type
+    {
+        get => _type;
+        set => this.RaiseAndSetIfChanged(ref _type, value);
+    }
+
+    public FileSystemItem? Parent
+    {
+        get => _parent;
+        set => this.RaiseAndSetIfChanged(ref _parent, value);
+    }
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => this.RaiseAndSetIfChanged(ref _isSelected, value);
+    }
+
     public ObservableCollection<FileSystemItem> Children { get; } = new();
-    public bool IsSelected { get; set; }
 
     public string GetRelativePath(string basePath)
     {

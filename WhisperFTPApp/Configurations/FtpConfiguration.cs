@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using WhisperFTPApp.Constants;
 
 namespace WhisperFTPApp.Configurations;
 
@@ -7,13 +8,13 @@ public sealed class FtpConfiguration
     public required string FtpAddress { get; init; }
     public required string Username { get; init; }
     public required string Password { get; init; }
-    public int Port { get; init; } = 21;
-    public int Timeout { get; init; } = 10000;
+    public int Port { get; init; } = AppConstants.DefaultFtpPort;
+    public int Timeout { get; init; } = AppConstants.DefaultTimeout;
     public bool EnableSsl { get; init; }
     public bool UsePassive { get; init; } = true;
     public bool UseBinary { get; init; } = true;
     public bool KeepAlive { get; init; } = true;
-    public int ReadWriteTimeout { get; init; } = 30000;
+    public int ReadWriteTimeout { get; init; } = AppConstants.DefaultReadWriteTimeout;
     public IWebProxy? Proxy { get; init; }
     public bool UseDefaultCredentials { get; init; }
     public string? ConnectionGroupName { get; init; }
@@ -24,11 +25,9 @@ public sealed class FtpConfiguration
     public System.Security.Principal.TokenImpersonationLevel ImpersonationLevel { get; init; } =
         System.Security.Principal.TokenImpersonationLevel.Delegation;
 
-    public int BufferSize { get; init; } = 131072;
-
-    public int MaxRetries { get; init; } = 3;
-
-    public int RetryDelay { get; init; } = 2000;
+    public int BufferSize { get; init; } = AppConstants.DefaultBufferSize;
+    public int MaxRetries { get; init; } = AppConstants.DefaultMaxRetries;
+    public int RetryDelay { get; init; } = AppConstants.DefaultRetryDelay;
 
     public FtpConfiguration()
     {

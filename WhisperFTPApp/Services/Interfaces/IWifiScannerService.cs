@@ -10,6 +10,6 @@ public interface IWifiScannerService
 
     Task<List<WifiNetwork>> ScanNetworksAsync(CancellationToken token);
     Task<bool> ConnectToNetworkAsync(string ssid);
-    Task<bool> CheckFtpAccessAsync(string ipAddress);
     void StopScan();
+    void ClearScanCache();
 }
