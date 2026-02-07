@@ -4,10 +4,15 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:global="clr-namespace:WhisperFTPApp.Converters"
-        mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="768"
+        mc:Ignorable="d" d:DesignWidth="1366" d:DesignHeight="768"
         x:Class="WhisperFTPApp.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/icon.ico"
+        Width="1366"
+        Height="768"
+        MinWidth="1024"
+        MinHeight="768"
+        WindowStartupLocation="CenterScreen"
         Opacity="0.9"
         Title="AzioWhisper FTP">
 
