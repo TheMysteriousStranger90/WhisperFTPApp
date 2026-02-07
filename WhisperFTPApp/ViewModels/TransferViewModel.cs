@@ -105,11 +105,21 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
                     result.SuccessCount++;
                     ((IProgress<double>)progress).Report((double)(i + 1) / request.Items.Count * 100);
                 }
+                catch (IOException ex)
+                {
+                    StaticFileLogger.LogError($"Failed to upload {item.Name}: {ex.Message}");
+                    result.FailCount++;
+                    result.FailedItems.Add(item.Name);
+                    StatusChanged?.Invoke(this, new StatusChangedEventArgs(
+                        $"Failed to upload '{item.Name}' after retries: {ex.Message}"));
+                }
                 catch (Exception ex)
                 {
                     StaticFileLogger.LogError($"Failed to upload {item.Name}: {ex.Message}");
                     result.FailCount++;
                     result.FailedItems.Add(item.Name);
+                    StatusChanged?.Invoke(this, new StatusChangedEventArgs(
+                        $"Error uploading '{item.Name}': {ex.Message}"));
                 }
             }
 
@@ -183,11 +193,21 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
                     result.SuccessCount++;
                     ((IProgress<double>)progress).Report((double)(i + 1) / request.Items.Count * 100);
                 }
+                catch (IOException ex)
+                {
+                    StaticFileLogger.LogError($"Failed to download {item.Name}: {ex.Message}");
+                    result.FailCount++;
+                    result.FailedItems.Add(item.Name);
+                    StatusChanged?.Invoke(this, new StatusChangedEventArgs(
+                        $"Failed to download '{item.Name}' after retries: {ex.Message}"));
+                }
                 catch (Exception ex)
                 {
                     StaticFileLogger.LogError($"Failed to download {item.Name}: {ex.Message}");
                     result.FailCount++;
                     result.FailedItems.Add(item.Name);
+                    StatusChanged?.Invoke(this, new StatusChangedEventArgs(
+                        $"Error downloading '{item.Name}': {ex.Message}"));
                 }
             }
 

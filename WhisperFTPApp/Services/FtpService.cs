@@ -94,6 +94,7 @@ internal sealed class FtpService : IFtpService, IDisposable
                 await _client.DisposeAsync().ConfigureAwait(false);
                 _client = null;
             }
+
             StaticFileLogger.LogInformation("Disconnected from FTP server");
         }
         finally
@@ -102,7 +103,8 @@ internal sealed class FtpService : IFtpService, IDisposable
         }
     }
 
-    public async Task<bool> TestSecureConnectionAsync(FtpConfiguration configuration, CancellationToken cancellationToken = default)
+    public async Task<bool> TestSecureConnectionAsync(FtpConfiguration configuration,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -265,41 +267,80 @@ internal sealed class FtpService : IFtpService, IDisposable
         ArgumentNullException.ThrowIfNull(localPath);
         ArgumentNullException.ThrowIfNull(remotePath);
 
-        StaticFileLogger.LogInformation($"Starting upload: {localPath} -> {remotePath}");
+        var fileInfo = new FileInfo(localPath);
+        StaticFileLogger.LogInformation(
+            $"Starting upload: {localPath} -> {remotePath} (Size: {fileInfo.Length} bytes)");
 
-        try
+        int maxRetries = configuration.MaxRetries > 0 ? configuration.MaxRetries : MaxRetries;
+        Exception? lastException = null;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
-            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
-
-            Progress<FtpProgress>? ftpProgress = null;
-            if (progress != null)
+            try
             {
-                ftpProgress = new Progress<FtpProgress>(p => progress.Report(p.Progress));
+                var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
+
+                Progress<FtpProgress>? ftpProgress = null;
+                if (progress != null)
+                {
+                    ftpProgress = new Progress<FtpProgress>(p => progress.Report(p.Progress));
+                }
+
+                var result = await client.UploadFile(
+                    localPath,
+                    remotePath,
+                    FtpRemoteExists.Overwrite,
+                    true,
+                    FtpVerify.None,
+                    ftpProgress,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (result == FtpStatus.Success)
+                {
+                    StaticFileLogger.LogInformation($"Upload completed: {remotePath}");
+                    return;
+                }
+
+                var errorMsg = $"Upload returned status {result} for {remotePath} (attempt {attempt}/{maxRetries})";
+                StaticFileLogger.LogError(errorMsg);
+                lastException = new IOException(errorMsg);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                StaticFileLogger.LogInformation("Upload cancelled by user");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                StaticFileLogger.LogError(
+                    $"Upload attempt {attempt}/{maxRetries} failed for {remotePath}: {ex.Message}");
             }
 
-            var result = await client.UploadFile(
-                localPath,
-                remotePath,
-                FtpRemoteExists.Overwrite,
-                true,
-                FtpVerify.None,
-                ftpProgress,
-                cancellationToken).ConfigureAwait(false);
+            if (attempt < maxRetries)
+            {
+                int delay = configuration.RetryDelay > 0 ? configuration.RetryDelay * attempt : BaseDelay * attempt;
+                StaticFileLogger.LogInformation($"Retrying upload in {delay}ms...");
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
 
-            if (result == FtpStatus.Success)
-            {
-                StaticFileLogger.LogInformation($"Upload completed: {remotePath}");
-            }
-            else
-            {
-                StaticFileLogger.LogWarning($"Upload finished with status: {result}");
+                try
+                {
+                    if (_client != null)
+                    {
+                        await _client.DisposeAsync().ConfigureAwait(false);
+                        _client = null;
+                    }
+                }
+                catch
+                {
+                    /* ignore cleanup errors */
+                }
             }
         }
-        catch (Exception ex)
-        {
-            StaticFileLogger.LogError($"Upload failed {remotePath}: {ex.Message}");
-            throw;
-        }
+
+        throw new IOException(
+            $"Upload failed after {maxRetries} attempts for {remotePath}: " +
+            $"{lastException?.Message ?? "Unknown error"}", lastException);
     }
 
     public async Task UploadFileWithResumeAsync(
@@ -363,51 +404,93 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         StaticFileLogger.LogInformation($"Starting download: {remotePath} -> {localPath}");
 
-        try
+        int maxRetries = configuration.MaxRetries > 0 ? configuration.MaxRetries : MaxRetries;
+        Exception? lastException = null;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
-            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
-
-            Progress<FtpProgress>? ftpProgress = null;
-            if (progress != null)
+            try
             {
-                ftpProgress = new Progress<FtpProgress>(p => progress.Report(p.Progress));
+                var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
+
+                Progress<FtpProgress>? ftpProgress = null;
+                if (progress != null)
+                {
+                    ftpProgress = new Progress<FtpProgress>(p => progress.Report(p.Progress));
+                }
+
+                var result = await client.DownloadFile(
+                    localPath,
+                    remotePath,
+                    FtpLocalExists.Overwrite,
+                    FtpVerify.None,
+                    ftpProgress,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (result == FtpStatus.Success)
+                {
+                    StaticFileLogger.LogInformation($"Download completed: {localPath}");
+                    return;
+                }
+
+                var errorMsg = $"Download returned status {result} for {remotePath} (attempt {attempt}/{maxRetries})";
+                StaticFileLogger.LogError(errorMsg);
+                lastException = new IOException(errorMsg);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                CleanupIncompleteFile(localPath);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                StaticFileLogger.LogError(
+                    $"Download attempt {attempt}/{maxRetries} failed for {remotePath}: {ex.Message}");
             }
 
-            var result = await client.DownloadFile(
-                localPath,
-                remotePath,
-                FtpLocalExists.Overwrite,
-                FtpVerify.None,
-                ftpProgress,
-                cancellationToken).ConfigureAwait(false);
+            CleanupIncompleteFile(localPath);
 
-            if (result == FtpStatus.Success)
+            if (attempt < maxRetries)
             {
-                StaticFileLogger.LogInformation($"Download completed: {localPath}");
-            }
-            else
-            {
-                StaticFileLogger.LogWarning($"Download finished with status: {result}");
-            }
-        }
-        catch (Exception ex)
-        {
-            StaticFileLogger.LogError($"Download failed {remotePath}: {ex.Message}");
+                int delay = configuration.RetryDelay > 0 ? configuration.RetryDelay * attempt : BaseDelay * attempt;
+                StaticFileLogger.LogInformation($"Retrying download in {delay}ms...");
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
 
-            if (File.Exists(localPath))
-            {
                 try
                 {
-                    File.Delete(localPath);
-                    StaticFileLogger.LogInformation($"Deleted incomplete file: {localPath}");
+                    if (_client != null)
+                    {
+                        await _client.DisposeAsync().ConfigureAwait(false);
+                        _client = null;
+                    }
                 }
-                catch (Exception deleteEx)
+                catch
                 {
-                    StaticFileLogger.LogError($"Failed to delete incomplete file: {deleteEx.Message}");
+                    /* ignore cleanup errors */
                 }
             }
+        }
 
-            throw;
+        CleanupIncompleteFile(localPath);
+        throw new IOException(
+            $"Download failed after {maxRetries} attempts for {remotePath}: " +
+            $"{lastException?.Message ?? "Unknown error"}", lastException);
+    }
+
+    private static void CleanupIncompleteFile(string localPath)
+    {
+        if (File.Exists(localPath))
+        {
+            try
+            {
+                File.Delete(localPath);
+                StaticFileLogger.LogInformation($"Deleted incomplete file: {localPath}");
+            }
+            catch (Exception deleteEx)
+            {
+                StaticFileLogger.LogError($"Failed to delete incomplete file: {deleteEx.Message}");
+            }
         }
     }
 
@@ -564,13 +647,16 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         var client = new AsyncFtpClient(uri.Host, configuration.Username, configuration.Password, configuration.Port);
 
-        client.Config.ConnectTimeout = configuration.Timeout > 0 ? configuration.Timeout : 15000;
+        client.Config.ConnectTimeout = configuration.Timeout > 0 ? configuration.Timeout : 30000;
         client.Config.DataConnectionReadTimeout = configuration.ReadWriteTimeout > 0
             ? configuration.ReadWriteTimeout
-            : 30000;
+            : 60000;
         client.Config.DataConnectionConnectTimeout = configuration.ReadWriteTimeout > 0
             ? configuration.ReadWriteTimeout
-            : 30000;
+            : 60000;
+
+        client.Config.TransferChunkSize = configuration.BufferSize;
+        client.Config.LocalFileBufferSize = configuration.BufferSize;
 
         client.Config.EncryptionMode = configuration.EnableSsl
             ? FtpEncryptionMode.Explicit
@@ -589,12 +675,14 @@ internal sealed class FtpService : IFtpService, IDisposable
         client.Config.SocketKeepAlive = true;
 
         StaticFileLogger.LogInformation(
-            $"Client created - Host: {uri.Host}, Port: {configuration.Port}, SSL: {configuration.EnableSsl}, Passive: {configuration.UsePassive}");
+            $"Client created - Host: {uri.Host}, Port: {configuration.Port}, SSL: {configuration.EnableSsl}, " +
+            $"Passive: {configuration.UsePassive}, BufferSize: {configuration.BufferSize}");
 
         return client;
     }
 
-    private async Task<AsyncFtpClient> GetOrCreateClientAsync(FtpConfiguration configuration, CancellationToken cancellationToken)
+    private async Task<AsyncFtpClient> GetOrCreateClientAsync(FtpConfiguration configuration,
+        CancellationToken cancellationToken)
     {
         await _clientLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
