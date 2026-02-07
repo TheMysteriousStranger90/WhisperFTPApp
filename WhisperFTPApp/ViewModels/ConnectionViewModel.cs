@@ -1,8 +1,10 @@
 ﻿using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Reactive;
 using ReactiveUI;
 using WhisperFTPApp.Configurations;
 using WhisperFTPApp.Constants;
+using WhisperFTPApp.Events;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Services.Interfaces;
@@ -18,7 +20,7 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
     private string _ftpAddress = string.Empty;
     private string _username = string.Empty;
     private string _password = string.Empty;
-    private string _port = AppConstants.DefaultFtpPort.ToString();
+    private string _port = AppConstants.DefaultFtpPort.ToString(CultureInfo.InvariantCulture);
     private bool _isConnected;
     private int _timeout = AppConstants.DefaultTimeout;
     private int _readWriteTimeout = AppConstants.DefaultReadWriteTimeout;
@@ -145,9 +147,9 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
     public ReactiveCommand<FtpConnectionEntity, Unit> DeleteConnectionCommand { get; }
     public ReactiveCommand<Unit, Unit> ShowRecentConnectionsCommand { get; }
 
-    public event Action<string>? StatusChanged;
-    public event Action? ConnectionEstablished;
-    public event Action? ConnectionLost;
+    public event EventHandler<StatusChangedEventArgs>? StatusChanged;
+    public event EventHandler? ConnectionEstablished;
+    public event EventHandler? ConnectionLost;
 
     public FtpConfiguration CreateConfiguration()
     {
@@ -190,7 +192,7 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
         StaticFileLogger.LogInformation($"Attempting to connect to {FtpAddress}");
         try
         {
-            StatusChanged?.Invoke("Connecting to FTP server...");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs("Connecting to FTP server..."));
 
             var configuration = CreateConfiguration();
             bool isConnected = await _ftpService.ConnectAsync(configuration, cancellationToken).ConfigureAwait(true);
@@ -198,22 +200,23 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
             if (isConnected)
             {
                 IsConnected = true;
-                StatusChanged?.Invoke("Connected successfully");
+                StatusChanged?.Invoke(this, new StatusChangedEventArgs("Connected successfully"));
                 StaticFileLogger.LogInformation($"Successfully connected to {FtpAddress}");
                 await SaveSuccessfulConnectionAsync(cancellationToken).ConfigureAwait(true);
-                ConnectionEstablished?.Invoke();
+                ConnectionEstablished?.Invoke(this, EventArgs.Empty);
                 return true;
             }
 
             IsConnected = false;
-            StatusChanged?.Invoke("Failed to connect. Please check your credentials.");
+            StatusChanged?.Invoke(this,
+                new StatusChangedEventArgs("Failed to connect. Please check your credentials."));
             StaticFileLogger.LogError($"Failed to connect to {FtpAddress}");
             return false;
         }
         catch (Exception ex)
         {
             IsConnected = false;
-            StatusChanged?.Invoke($"Connection error: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Connection error: {ex.Message}"));
             StaticFileLogger.LogError($"Connection error: {ex.Message}");
             return false;
         }
@@ -226,13 +229,13 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
         {
             await _ftpService.DisconnectAsync(cancellationToken).ConfigureAwait(true);
             IsConnected = false;
-            StatusChanged?.Invoke("Disconnected from FTP server");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs("Disconnected from FTP server"));
             StaticFileLogger.LogInformation("Successfully disconnected from FTP server");
-            ConnectionLost?.Invoke();
+            ConnectionLost?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
-            StatusChanged?.Invoke($"Error disconnecting: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Error disconnecting: {ex.Message}"));
             StaticFileLogger.LogError($"Disconnect failed: {ex.Message}");
         }
     }
@@ -242,8 +245,8 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
         FtpAddress = string.Empty;
         Username = string.Empty;
         Password = string.Empty;
-        Port = AppConstants.DefaultFtpPort.ToString();
-        StatusChanged?.Invoke("Fields cleared");
+        Port = AppConstants.DefaultFtpPort.ToString(CultureInfo.InvariantCulture);
+        StatusChanged?.Invoke(this, new StatusChangedEventArgs("Fields cleared"));
     }
 
     private async Task SaveSuccessfulConnectionAsync(CancellationToken cancellationToken = default)
@@ -294,12 +297,13 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
         }
         catch (Exception ex)
         {
-            StatusChanged?.Invoke($"Error loading connections: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Error loading connections: {ex.Message}"));
             _recentConnections.Clear();
         }
     }
 
-    private async Task SwitchConnectionAsync(FtpConnectionEntity connection, CancellationToken cancellationToken = default)
+    private async Task SwitchConnectionAsync(FtpConnectionEntity connection,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -315,7 +319,7 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
         }
         catch (Exception ex)
         {
-            StatusChanged?.Invoke($"Error switching connection: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Error switching connection: {ex.Message}"));
         }
         finally
         {
@@ -323,17 +327,18 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
         }
     }
 
-    private async Task DeleteConnectionAsync(FtpConnectionEntity connection, CancellationToken cancellationToken = default)
+    private async Task DeleteConnectionAsync(FtpConnectionEntity connection,
+        CancellationToken cancellationToken = default)
     {
         try
         {
             await _settingsService.DeleteConnectionAsync(connection, cancellationToken).ConfigureAwait(true);
             _recentConnections.Remove(connection);
-            StatusChanged?.Invoke("Connection removed from history");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs("Connection removed from history"));
         }
         catch (Exception ex)
         {
-            StatusChanged?.Invoke($"Error removing connection: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Error removing connection: {ex.Message}"));
         }
     }
 

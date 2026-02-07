@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Runtime.InteropServices;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using WhisperFTPApp.Data;
 using WhisperFTPApp.Services;
@@ -31,7 +32,11 @@ internal static class ServiceCollectionExtensions
 #endif
         });
 
-        collection.AddSingleton<ICredentialEncryption, CredentialEncryptionService>();
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            collection.AddSingleton<ICredentialEncryption, CredentialEncryptionService>();
+        }
+
         collection.AddSingleton<ISettingsService, SettingsService>();
         collection.AddSingleton<IFtpService, FtpService>();
         collection.AddSingleton<IBackgroundService, BackgroundService>();

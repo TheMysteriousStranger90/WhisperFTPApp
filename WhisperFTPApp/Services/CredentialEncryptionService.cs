@@ -1,10 +1,12 @@
-﻿using System.Security.Cryptography;
+﻿using System.Runtime.Versioning;
+using System.Security.Cryptography;
 using System.Text;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Services.Interfaces;
 
 namespace WhisperFTPApp.Services;
 
+[SupportedOSPlatform("windows")]
 internal sealed class CredentialEncryptionService : ICredentialEncryption
 {
     private static readonly byte[] Entropy = "WhisperFTP_Salt_2024"u8.ToArray();

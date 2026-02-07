@@ -10,26 +10,21 @@ internal static class StaticFileLogger
     private static readonly Lazy<string> _filePath = new(() => _pathManager.Value.GetLogFilePath());
     private static readonly SemaphoreSlim _writeLock = new(1, 1);
     private static readonly ConcurrentQueue<string> _logQueue = new();
-    private static readonly Timer _flushTimer;
-    private static bool _isEnabled = true;
+    private static readonly Timer _flushTimer = new(FlushLogs, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
 
-    static StaticFileLogger()
-    {
-        _flushTimer = new Timer(FlushLogs, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => Flush();
-    }
-
-    public static bool IsEnabled
-    {
-        get => _isEnabled;
-        set => _isEnabled = value;
-    }
+    public static bool IsEnabled { get; set; } = true;
 
     public static string LogFolderPath => _pathManager.Value.AppDataDirectory;
 
+    static StaticFileLogger()
+    {
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => Flush();
+        GC.KeepAlive(_flushTimer);
+    }
+
     private static void Log(LogLevel logLevel, string message)
     {
-        if (!_isEnabled || logLevel == LogLevel.None) return;
+        if (!IsEnabled || logLevel == LogLevel.None) return;
 
         var logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{logLevel,-11}] {message}";
         _logQueue.Enqueue(logEntry);

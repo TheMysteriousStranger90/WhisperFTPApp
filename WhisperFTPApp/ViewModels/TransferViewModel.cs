@@ -2,8 +2,10 @@
 using System.Reactive;
 using ReactiveUI;
 using WhisperFTPApp.Configurations;
+using WhisperFTPApp.Events;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
+using WhisperFTPApp.Models.Transfer;
 using WhisperFTPApp.Services.Interfaces;
 
 namespace WhisperFTPApp.ViewModels;
@@ -42,9 +44,10 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
     public ReactiveCommand<TransferRequest, Unit> DownloadCommand { get; }
     public ReactiveCommand<DeleteRequest, Unit> DeleteCommand { get; }
 
-    public event Action<string>? StatusChanged;
+    public event EventHandler<StatusChangedEventArgs>? StatusChanged;
 
-    public async Task<TransferResult> UploadAsync(TransferRequest request, CancellationToken cancellationToken = default)
+    public async Task<TransferResult> UploadAsync(TransferRequest request,
+        CancellationToken cancellationToken = default)
     {
         IsTransferring = true;
         StaticFileLogger.LogInformation($"Starting upload operation");
@@ -56,7 +59,7 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
             var configuration = _configurationFactory();
             var progress = new Progress<double>(p => TransferProgress = p);
 
-            StatusChanged?.Invoke($"Uploading {request.Items.Count} item(s)...");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Uploading {request.Items.Count} item(s)..."));
 
             for (int i = 0; i < request.Items.Count; i++)
             {
@@ -75,8 +78,8 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
                         var existingModified = await _ftpService.GetFileModifiedTimeAsync(
                             configuration, remotePath, cancellationToken).ConfigureAwait(true);
 
-                        StatusChanged?.Invoke(
-                            $"File {item.Name} already exists (Size: {existingSize} bytes, Modified: {existingModified:g}). Skipping...");
+                        StatusChanged?.Invoke(this, new StatusChangedEventArgs(
+                            $"File {item.Name} already exists (Size: {existingSize} bytes, Modified: {existingModified:g}). Skipping..."));
                         result.SkippedCount++;
                         await Task.Delay(1000, cancellationToken).ConfigureAwait(true);
                         continue;
@@ -84,14 +87,16 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
 
                     if (item.IsDirectory)
                     {
-                        await UploadDirectoryAsync(configuration, item, request.TargetDirectory, progress, cancellationToken)
+                        await UploadDirectoryAsync(configuration, item, request.TargetDirectory, progress,
+                                cancellationToken)
                             .ConfigureAwait(true);
                     }
                     else
                     {
-                        StatusChanged?.Invoke($"Uploading {item.Name} ({i + 1}/{request.Items.Count})...");
+                        StatusChanged?.Invoke(this,
+                            new StatusChangedEventArgs($"Uploading {item.Name} ({i + 1}/{request.Items.Count})..."));
                         await _ftpService.UploadFileAsync(
-                            configuration, item.FullPath, remotePath, progress, cancellationToken)
+                                configuration, item.FullPath, remotePath, progress, cancellationToken)
                             .ConfigureAwait(true);
                     }
 
@@ -106,13 +111,13 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
                 }
             }
 
-            StatusChanged?.Invoke(result.SuccessCount > 0
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs(result.SuccessCount > 0
                 ? $"Upload complete: {result.SuccessCount} succeeded, {result.FailCount} failed"
-                : "Upload failed");
+                : "Upload failed"));
         }
         catch (Exception ex)
         {
-            StatusChanged?.Invoke($"Upload failed: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Upload failed: {ex.Message}"));
             StaticFileLogger.LogError($"Upload failed: {ex.Message}");
         }
         finally
@@ -124,7 +129,8 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
         return result;
     }
 
-    public async Task<TransferResult> DownloadAsync(TransferRequest request, CancellationToken cancellationToken = default)
+    public async Task<TransferResult> DownloadAsync(TransferRequest request,
+        CancellationToken cancellationToken = default)
     {
         IsTransferring = true;
         StaticFileLogger.LogInformation($"Starting download operation");
@@ -136,7 +142,7 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
             var configuration = _configurationFactory();
             var progress = new Progress<double>(p => TransferProgress = p);
 
-            StatusChanged?.Invoke($"Downloading {request.Items.Count} item(s)...");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Downloading {request.Items.Count} item(s)..."));
 
             for (int i = 0; i < request.Items.Count; i++)
             {
@@ -148,8 +154,8 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
                     if (!item.IsDirectory && File.Exists(localPath))
                     {
                         var localInfo = new FileInfo(localPath);
-                        StatusChanged?.Invoke(
-                            $"File {item.Name} already exists locally (Size: {localInfo.Length} bytes). Skipping...");
+                        StatusChanged?.Invoke(this, new StatusChangedEventArgs(
+                            $"File {item.Name} already exists locally (Size: {localInfo.Length} bytes). Skipping..."));
                         result.SkippedCount++;
                         await Task.Delay(1000, cancellationToken).ConfigureAwait(true);
                         continue;
@@ -157,14 +163,16 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
 
                     if (item.IsDirectory)
                     {
-                        await DownloadDirectoryAsync(configuration, item, request.TargetDirectory, progress, cancellationToken)
+                        await DownloadDirectoryAsync(configuration, item, request.TargetDirectory, progress,
+                                cancellationToken)
                             .ConfigureAwait(true);
                     }
                     else
                     {
-                        StatusChanged?.Invoke($"Downloading {item.Name} ({i + 1}/{request.Items.Count})...");
+                        StatusChanged?.Invoke(this,
+                            new StatusChangedEventArgs($"Downloading {item.Name} ({i + 1}/{request.Items.Count})..."));
                         await _ftpService.DownloadFileAsync(
-                            configuration, item.FullPath, localPath, progress, cancellationToken)
+                                configuration, item.FullPath, localPath, progress, cancellationToken)
                             .ConfigureAwait(true);
                     }
 
@@ -179,13 +187,13 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
                 }
             }
 
-            StatusChanged?.Invoke(result.SuccessCount > 0
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs(result.SuccessCount > 0
                 ? $"Download complete: {result.SuccessCount} succeeded, {result.FailCount} failed"
-                : "Download failed");
+                : "Download failed"));
         }
         catch (Exception ex)
         {
-            StatusChanged?.Invoke($"Download failed: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Download failed: {ex.Message}"));
             StaticFileLogger.LogError($"Download failed: {ex.Message}");
         }
         finally
@@ -207,14 +215,14 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
         {
             var configuration = _configurationFactory();
 
-            StatusChanged?.Invoke($"Deleting {request.Items.Count} item(s)...");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Deleting {request.Items.Count} item(s)..."));
             StaticFileLogger.LogInformation($"Attempting to delete {request.Items.Count} items");
 
             foreach (var item in request.Items)
             {
                 try
                 {
-                    StatusChanged?.Invoke($"Deleting {item.Name}...");
+                    StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Deleting {item.Name}..."));
 
                     if (item.IsDirectory)
                     {
@@ -242,13 +250,13 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
                 }
             }
 
-            StatusChanged?.Invoke(result.SuccessCount > 0
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs(result.SuccessCount > 0
                 ? $"Delete complete: {result.SuccessCount} succeeded, {result.FailCount} failed"
-                : "Delete failed");
+                : "Delete failed"));
         }
         catch (Exception ex)
         {
-            StatusChanged?.Invoke($"Delete operation failed: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Delete operation failed: {ex.Message}"));
             StaticFileLogger.LogError($"Delete operation failed: {ex.Message}");
         }
         finally
@@ -291,7 +299,7 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
             {
                 var fileName = Path.GetFileName(file);
                 var remoteFilePath = Path.Combine(targetPath, fileName).Replace('\\', '/');
-                StatusChanged?.Invoke($"Uploading {fileName}...");
+                StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Uploading {fileName}..."));
 
                 await _ftpService.UploadFileAsync(config, file, remoteFilePath, progress, cancellationToken)
                     .ConfigureAwait(true);
@@ -347,7 +355,7 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
                 else
                 {
                     var itemPath = Path.Combine(targetPath, item.Name);
-                    StatusChanged?.Invoke($"Downloading {item.Name}...");
+                    StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Downloading {item.Name}..."));
 
                     await _ftpService.DownloadFileAsync(config, item.FullPath, itemPath, progress, cancellationToken)
                         .ConfigureAwait(true);
@@ -370,7 +378,7 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
         {
             var errorMessage = $"Access denied for '{itemName}'";
             StaticFileLogger.LogWarning(errorMessage);
-            StatusChanged?.Invoke($"Cannot delete '{itemName}': Access denied");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Cannot delete '{itemName}': Access denied"));
         }
         else
         {
@@ -387,30 +395,4 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
         DownloadCommand.Dispose();
         DeleteCommand.Dispose();
     }
-}
-
-public class TransferRequest
-{
-    public List<FileSystemItem> Items { get; set; } = new();
-    public string TargetDirectory { get; set; } = string.Empty;
-}
-
-public class TransferResult
-{
-    public int SuccessCount { get; set; }
-    public int FailCount { get; set; }
-    public int SkippedCount { get; set; }
-    public List<string> FailedItems { get; } = new();
-}
-
-public class DeleteRequest
-{
-    public List<FileSystemItem> Items { get; set; } = new();
-}
-
-public class DeleteResult
-{
-    public int SuccessCount { get; set; }
-    public int FailCount { get; set; }
-    public List<string> FailedItems { get; } = new();
 }

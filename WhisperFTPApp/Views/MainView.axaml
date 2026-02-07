@@ -95,7 +95,7 @@
                 <Panel Width="24" Height="24" IsVisible="{Binding Transfer.IsTransferring}">
                     <PathIcon Data="{StaticResource RefreshIcon}">
                         <PathIcon.RenderTransform>
-                            <RotateTransform/>
+                            <RotateTransform />
                         </PathIcon.RenderTransform>
                         <PathIcon.Styles>
                             <Style Selector="PathIcon">
@@ -167,7 +167,8 @@
                                 Spacing="16"
                                 Margin="0,8,0,0">
                         <TextBlock Text="{Binding LocalFiles.LocalFileStats.TotalItems, StringFormat='Files: {0}'}" />
-                        <TextBlock Text="{Binding LocalFiles.LocalFileStats.TotalSize,
+                        <TextBlock
+                            Text="{Binding LocalFiles.LocalFileStats.TotalSize,
                                    Converter={StaticResource FileSizeConverter},
                                    StringFormat='Size: {0}'}" />
                         <TextBlock Text="{Binding LocalFiles.SelectedLocalItems.Count, StringFormat='Selected: {0}'}"
@@ -182,7 +183,8 @@
                               AutoGenerateColumns="False"
                               Margin="0,8">
                         <i:Interaction.Behaviors>
-                            <behaviors:DataGridSelectionBehavior SelectedItems="{Binding LocalFiles.SelectedLocalItems}" />
+                            <behaviors:DataGridSelectionBehavior
+                                SelectedItems="{Binding LocalFiles.SelectedLocalItems}" />
                             <ia:EventTriggerBehavior EventName="DoubleTapped">
                                 <ia:InvokeCommandAction Command="{Binding LocalFiles.NavigateToLocalDirectoryCommand}"
                                                         CommandParameter="{Binding LocalFiles.SelectedLocalItem}" />
@@ -226,28 +228,28 @@
                             <Button Command="{Binding UploadCommand}"
                                     IsEnabled="{Binding Connection.IsConnected}">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <PathIcon Data="{StaticResource UploadIcon}" Width="18" Height="18"/>
+                                    <PathIcon Data="{StaticResource UploadIcon}" Width="18" Height="18" />
                                     <TextBlock Text="{DynamicResource Upload}" />
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding DownloadCommand}"
                                     IsEnabled="{Binding Connection.IsConnected}">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <PathIcon Data="{StaticResource DownloadIcon}" Width="18" Height="18"/>
+                                    <PathIcon Data="{StaticResource DownloadIcon}" Width="18" Height="18" />
                                     <TextBlock Text="{DynamicResource Download}" />
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding DeleteCommand}" Classes="danger"
                                     IsEnabled="{Binding Connection.IsConnected}">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <PathIcon Data="{StaticResource DeleteIcon}" Width="18" Height="18"/>
+                                    <PathIcon Data="{StaticResource DeleteIcon}" Width="18" Height="18" />
                                     <TextBlock Text="{DynamicResource Delete}" />
                                 </StackPanel>
                             </Button>
                             <Button Command="{Binding RemoteFiles.RefreshCommand}"
                                     IsEnabled="{Binding Connection.IsConnected}">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <PathIcon Data="{StaticResource RefreshIcon}" Width="18" Height="18"/>
+                                    <PathIcon Data="{StaticResource RefreshIcon}" Width="18" Height="18" />
                                     <TextBlock Text="{DynamicResource Refresh}" />
                                 </StackPanel>
                             </Button>
@@ -270,7 +272,8 @@
                                 Spacing="16"
                                 Margin="0,8,0,0">
                         <TextBlock Text="{Binding RemoteFiles.RemoteFileStats.TotalItems, StringFormat='Files: {0}'}" />
-                        <TextBlock Text="{Binding RemoteFiles.RemoteFileStats.TotalSize,
+                        <TextBlock
+                            Text="{Binding RemoteFiles.RemoteFileStats.TotalSize,
                                    Converter={StaticResource FileSizeConverter},
                                    StringFormat='Size: {0}'}" />
                         <TextBlock Text="{Binding RemoteFiles.SelectedFtpItems.Count, StringFormat='Selected: {0}'}"

@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Reactive;
 using ReactiveUI;
-using WhisperFTPApp.Constants;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Services;
 using WhisperFTPApp.Services.Interfaces;

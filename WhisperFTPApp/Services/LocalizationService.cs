@@ -7,32 +7,27 @@ using Avalonia;
 using Avalonia.Controls;
 using WhisperFTPApp.Assets;
 using WhisperFTPApp.Constants;
+using WhisperFTPApp.Events;
 
 namespace WhisperFTPApp.Services;
 
-public class CultureChangedEventArgs : EventArgs
-{
-    public CultureInfo Culture { get; }
-    public CultureChangedEventArgs(CultureInfo culture) => Culture = culture;
-}
-
 public class LocalizationService
 {
-    private static LocalizationService? _instance;
+    private static volatile LocalizationService? _instance;
     private static readonly object _instanceLock = new();
 
     public static LocalizationService Instance
     {
         get
         {
-            if (_instance == null)
+            var instance = _instance;
+            if (instance != null)
+                return instance;
+
+            lock (_instanceLock)
             {
-                lock (_instanceLock)
-                {
-                    _instance ??= new LocalizationService();
-                }
+                return _instance ??= new LocalizationService();
             }
-            return _instance;
         }
     }
 

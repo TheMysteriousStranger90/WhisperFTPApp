@@ -4,6 +4,7 @@ using System.Windows.Input;
 using ReactiveUI;
 using WhisperFTPApp.Commands;
 using WhisperFTPApp.Configurations;
+using WhisperFTPApp.Events;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Models.Navigations;
@@ -16,7 +17,7 @@ public sealed class RemoteFileViewModel : ReactiveObject, IDisposable
     private readonly IFtpService _ftpService;
     private readonly Func<FtpConfiguration> _configurationFactory;
 
-    private ObservableCollection<FileSystemItem> _ftpItems = new();
+    private readonly ObservableCollection<FileSystemItem> _ftpItems = new();
     private string _currentDirectory = "/";
     private FileSystemItem? _selectedFtpItem;
     private FileStats _remoteFileStats = new();
@@ -46,11 +47,7 @@ public sealed class RemoteFileViewModel : ReactiveObject, IDisposable
         });
     }
 
-    public ObservableCollection<FileSystemItem> FtpItems
-    {
-        get => _ftpItems;
-        private set => this.RaiseAndSetIfChanged(ref _ftpItems, value);
-    }
+    public ObservableCollection<FileSystemItem> FtpItems => _ftpItems;
 
     public string CurrentDirectory
     {
@@ -95,7 +92,7 @@ public sealed class RemoteFileViewModel : ReactiveObject, IDisposable
     public ReactiveCommand<Unit, Unit> RefreshCommand { get; }
     public ICommand NavigateToPathCommand { get; }
 
-    public event Action<string>? StatusChanged;
+    public event EventHandler<StatusChangedEventArgs>? StatusChanged;
 
     public void ClearItems()
     {
@@ -108,7 +105,7 @@ public sealed class RemoteFileViewModel : ReactiveObject, IDisposable
         try
         {
             IsTransferring = true;
-            StatusChanged?.Invoke("Refreshing directory...");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs("Refreshing directory..."));
             TransferProgress = 0;
 
             var configuration = _configurationFactory();
@@ -139,18 +136,18 @@ public sealed class RemoteFileViewModel : ReactiveObject, IDisposable
                 await Task.Delay(10, CancellationToken.None).ConfigureAwait(true);
             }
 
-            StatusChanged?.Invoke($"Directory refreshed ({itemsList.Count} items)");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Directory refreshed ({itemsList.Count} items)"));
             UpdateRemoteStats();
         }
         catch (OperationCanceledException)
         {
-            StatusChanged?.Invoke("Refresh timeout - server response too slow");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs("Refresh timeout - server response too slow"));
             _ftpItems.Clear();
             UpdateRemoteStats();
         }
         catch (Exception ex)
         {
-            StatusChanged?.Invoke($"Refresh failed: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Refresh failed: {ex.Message}"));
             _ftpItems.Clear();
             UpdateRemoteStats();
         }
@@ -193,7 +190,7 @@ public sealed class RemoteFileViewModel : ReactiveObject, IDisposable
         catch (Exception ex)
         {
             StaticFileLogger.LogError($"Navigation failed: {ex.Message}");
-            StatusChanged?.Invoke($"Navigation failed: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Navigation failed: {ex.Message}"));
         }
     }
 
@@ -229,8 +226,8 @@ public sealed class RemoteFileViewModel : ReactiveObject, IDisposable
     {
         RemoteFileStats = new FileStats
         {
-            TotalItems = FtpItems?.Count ?? 0,
-            TotalSize = FtpItems?.Sum(f => f.Size) ?? 0,
+            TotalItems = FtpItems.Count,
+            TotalSize = FtpItems.Sum(f => f.Size),
             SelectedItems = SelectedFtpItem != null ? 1 : 0,
             SelectedSize = SelectedFtpItem?.Size ?? 0
         };

@@ -3,6 +3,7 @@ using System.Reactive;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using ReactiveUI;
+using WhisperFTPApp.Events;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
 
@@ -52,11 +53,11 @@ public sealed class LocalFileViewModel : ReactiveObject, IDisposable
                 {
                     LocalCurrentPath = value.RootDirectory.FullName;
                     _ = RefreshLocalFilesAsync();
-                    StatusChanged?.Invoke($"Selected drive: {value.Name}");
+                    StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Selected drive: {value.Name}"));
                 }
                 catch (Exception ex)
                 {
-                    StatusChanged?.Invoke($"Error accessing drive: {ex.Message}");
+                    StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Error accessing drive: {ex.Message}"));
                 }
             }
         }
@@ -95,7 +96,7 @@ public sealed class LocalFileViewModel : ReactiveObject, IDisposable
     public ReactiveCommand<FileSystemItem, Unit> NavigateToLocalDirectoryCommand { get; }
     public ReactiveCommand<Control?, Unit> BrowseCommand { get; }
 
-    public event Action<string>? StatusChanged;
+    public event EventHandler<StatusChangedEventArgs>? StatusChanged;
 
     private void InitializeLocalNavigation()
     {
@@ -207,17 +208,18 @@ public sealed class LocalFileViewModel : ReactiveObject, IDisposable
 
             LocalItems = new ObservableCollection<FileSystemItem>(items);
             UpdateLocalStats();
-            StatusChanged?.Invoke($"Loaded {items.Count} items from {LocalCurrentPath}");
+            StatusChanged?.Invoke(this,
+                new StatusChangedEventArgs($"Loaded {items.Count} items from {LocalCurrentPath}"));
         }
         catch (UnauthorizedAccessException ex)
         {
-            StatusChanged?.Invoke($"Access denied: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Access denied: {ex.Message}"));
             StaticFileLogger.LogError($"Access denied: {ex.Message}");
             LocalItems = new ObservableCollection<FileSystemItem>();
         }
         catch (Exception ex)
         {
-            StatusChanged?.Invoke($"Error accessing directory: {ex.Message}");
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Error accessing directory: {ex.Message}"));
             StaticFileLogger.LogError($"Error accessing directory: {ex.Message}");
             LocalItems = new ObservableCollection<FileSystemItem>();
         }

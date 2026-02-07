@@ -1,8 +1,8 @@
 ﻿using System.Reactive;
 using Avalonia.Controls;
 using ReactiveUI;
-using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
+using WhisperFTPApp.Models.Transfer;
 using WhisperFTPApp.Services;
 using WhisperFTPApp.Services.Interfaces;
 using WhisperFTPApp.Views;
@@ -39,21 +39,18 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         _remoteFileViewModel = new RemoteFileViewModel(ftpService, () => _connectionViewModel.CreateConfiguration());
         _transferViewModel = new TransferViewModel(ftpService, () => _connectionViewModel.CreateConfiguration());
 
-        _connectionViewModel.StatusChanged += status => StatusMessage = status;
-        _localFileViewModel.StatusChanged += status => StatusMessage = status;
-        _remoteFileViewModel.StatusChanged += status => StatusMessage = status;
-        _transferViewModel.StatusChanged += status => StatusMessage = status;
+        _connectionViewModel.StatusChanged += (_, e) => StatusMessage = e.Message;
+        _localFileViewModel.StatusChanged += (_, e) => StatusMessage = e.Message;
+        _remoteFileViewModel.StatusChanged += (_, e) => StatusMessage = e.Message;
+        _transferViewModel.StatusChanged += (_, e) => StatusMessage = e.Message;
 
-        _connectionViewModel.ConnectionEstablished += async () =>
+        _connectionViewModel.ConnectionEstablished += async (_, _) =>
         {
             _remoteFileViewModel.ClearItems();
             await _remoteFileViewModel.RefreshDirectoryAsync().ConfigureAwait(false);
         };
 
-        _connectionViewModel.ConnectionLost += () =>
-        {
-            _remoteFileViewModel.ClearItems();
-        };
+        _connectionViewModel.ConnectionLost += (_, _) => { _remoteFileViewModel.ClearItems(); };
 
         UploadCommand = ReactiveCommand.CreateFromTask(UploadSelectedAsync);
         DownloadCommand = ReactiveCommand.CreateFromTask(DownloadSelectedAsync);
@@ -157,11 +154,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             ? _remoteFileViewModel.SelectedFtpItem.FullPath
             : _remoteFileViewModel.CurrentDirectory;
 
-        var request = new TransferRequest
-        {
-            Items = itemsToUpload,
-            TargetDirectory = targetDirectory
-        };
+        var request = new TransferRequest(itemsToUpload, targetDirectory);
 
         await _transferViewModel.UploadAsync(request, cancellationToken).ConfigureAwait(true);
         await _remoteFileViewModel.RefreshDirectoryAsync(cancellationToken).ConfigureAwait(true);
@@ -191,11 +184,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             return;
         }
 
-        var request = new TransferRequest
-        {
-            Items = itemsToDownload,
-            TargetDirectory = _localFileViewModel.LocalCurrentPath
-        };
+        var request = new TransferRequest(itemsToDownload, _localFileViewModel.LocalCurrentPath);
 
         await _transferViewModel.DownloadAsync(request, cancellationToken).ConfigureAwait(true);
         await _localFileViewModel.RefreshLocalFilesAsync(cancellationToken).ConfigureAwait(true);
@@ -225,7 +214,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
             return;
         }
 
-        var request = new DeleteRequest { Items = itemsToDelete };
+        var request = new DeleteRequest(itemsToDelete);
 
         await _transferViewModel.DeleteAsync(request, cancellationToken).ConfigureAwait(true);
 
