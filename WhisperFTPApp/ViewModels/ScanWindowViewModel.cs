@@ -5,6 +5,7 @@ using System.Reactive.Linq;
 using Avalonia.Threading;
 using ReactiveUI;
 using WhisperFTPApp.Enums;
+using WhisperFTPApp.Events;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Services;

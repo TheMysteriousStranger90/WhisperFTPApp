@@ -1,6 +1,6 @@
 ﻿namespace WhisperFTPApp.Validation;
 
-public sealed class ValidationResult
+internal sealed class ValidationResult
 {
     public bool IsValid { get; }
     public string ErrorMessage { get; }

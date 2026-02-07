@@ -3,7 +3,7 @@ using WhisperFTPApp.Models;
 
 namespace WhisperFTPApp.Data;
 
-public class AppDbContext : DbContext
+public sealed class AppDbContext : DbContext
 {
     public DbSet<FtpConnectionEntity> FtpConnections { get; set; } = null!;
     public DbSet<SettingsEntity> Settings { get; set; } = null!;

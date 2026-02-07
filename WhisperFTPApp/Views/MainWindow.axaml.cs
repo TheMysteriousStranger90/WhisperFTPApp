@@ -3,7 +3,7 @@ using WhisperFTPApp.ViewModels;
 
 namespace WhisperFTPApp.Views;
 
-public partial class MainWindow : Window
+internal sealed partial class MainWindow : Window
 {
     public MainWindow()
     {

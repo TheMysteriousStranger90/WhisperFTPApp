@@ -3,7 +3,7 @@ using ReactiveUI;
 
 namespace WhisperFTPApp.Models.Navigations;
 
-public class BreadcrumbItem : ReactiveObject
+public sealed class BreadcrumbItem : ReactiveObject
 {
     public string Path { get; }
     public string Display { get; }

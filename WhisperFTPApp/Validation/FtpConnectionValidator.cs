@@ -1,6 +1,6 @@
 ﻿namespace WhisperFTPApp.Validation;
 
-public static class FtpConnectionValidator
+internal static class FtpConnectionValidator
 {
     public static ValidationResult Validate(string? address, string? username, string? password, int port)
     {

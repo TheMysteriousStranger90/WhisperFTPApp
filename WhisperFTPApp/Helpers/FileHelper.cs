@@ -2,7 +2,7 @@
 
 namespace WhisperFTPApp.Helpers;
 
-public static class FileHelper
+internal static class FileHelper
 {
     private static readonly string[] SizeSuffixes = { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
 

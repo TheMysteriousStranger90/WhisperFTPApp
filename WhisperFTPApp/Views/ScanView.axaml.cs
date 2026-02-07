@@ -2,7 +2,7 @@
 
 namespace WhisperFTPApp.Views;
 
-public partial class ScanView : UserControl
+internal sealed partial class ScanView : UserControl
 {
     public ScanView()
     {

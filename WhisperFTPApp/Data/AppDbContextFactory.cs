@@ -4,7 +4,7 @@ using WhisperFTPApp.Services;
 
 namespace WhisperFTPApp.Data;
 
-public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
+internal sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {
     public AppDbContext CreateDbContext(string[] args)
     {

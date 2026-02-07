@@ -1,4 +1,5 @@
-﻿using WhisperFTPApp.Models;
+﻿using WhisperFTPApp.Events;
+using WhisperFTPApp.Models;
 
 namespace WhisperFTPApp.Services.Interfaces;
 

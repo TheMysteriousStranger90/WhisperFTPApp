@@ -2,7 +2,7 @@
 
 namespace WhisperFTPApp.Views;
 
-public partial class SettingsView : UserControl
+internal sealed partial class SettingsView : UserControl
 {
     public SettingsView()
     {

@@ -6,7 +6,7 @@ using Avalonia.Xaml.Interactivity;
 
 namespace WhisperFTPApp.Behaviors;
 
-public class DataGridSelectionBehavior : Behavior<DataGrid>
+internal sealed class DataGridSelectionBehavior : Behavior<DataGrid>
 {
     public static readonly StyledProperty<IList?> SelectedItemsProperty =
         AvaloniaProperty.Register<DataGridSelectionBehavior, IList?>(nameof(SelectedItems));

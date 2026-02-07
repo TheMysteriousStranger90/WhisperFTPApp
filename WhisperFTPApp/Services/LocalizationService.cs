@@ -11,7 +11,7 @@ using WhisperFTPApp.Events;
 
 namespace WhisperFTPApp.Services;
 
-public class LocalizationService
+internal sealed class LocalizationService
 {
     private static volatile LocalizationService? _instance;
     private static readonly object _instanceLock = new();

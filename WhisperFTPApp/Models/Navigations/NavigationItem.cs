@@ -1,6 +1,6 @@
 ﻿namespace WhisperFTPApp.Models.Navigations;
 
-public class NavigationItem
+public sealed class NavigationItem
 {
     public string Path { get; }
     public string Display { get; }

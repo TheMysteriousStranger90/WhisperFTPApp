@@ -1,6 +1,6 @@
 ﻿namespace WhisperFTPApp.Constants;
 
-public static class AppConstants
+internal static class AppConstants
 {
     public const string DefaultBackground = "avares://AzioWhisperFTP/Assets/Image (3).jpg";
     public const string AvaresPrefix = "avares://AzioWhisperFTP";

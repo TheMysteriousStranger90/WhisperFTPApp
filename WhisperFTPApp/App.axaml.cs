@@ -14,7 +14,7 @@ using WhisperFTPApp.Views;
 
 namespace WhisperFTPApp;
 
-public partial class App : Application
+internal sealed partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
 
