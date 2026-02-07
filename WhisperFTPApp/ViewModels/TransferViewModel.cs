@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Reactive;
+using FluentFTP.Exceptions;
 using ReactiveUI;
 using WhisperFTPApp.Configurations;
 using WhisperFTPApp.Events;
@@ -234,7 +235,6 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
         ArgumentNullException.ThrowIfNull(request);
 
         IsTransferring = true;
-
         var result = new DeleteResult();
 
         try
@@ -264,15 +264,17 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
                     result.SuccessCount++;
                     StaticFileLogger.LogInformation($"Successfully deleted: {item.Name}");
                 }
-                catch (WebException ex) when (ex.Response is FtpWebResponse ftpResponse)
+                catch (FtpCommandException ex)
                 {
-                    HandleFtpException(ftpResponse, item.Name, result);
+                    HandleFluentFtpException(ex, item.Name, result);
                 }
                 catch (Exception ex)
                 {
                     StaticFileLogger.LogError($"Failed to delete {item.Name}: {ex.Message}");
                     result.FailCount++;
                     result.FailedItems.Add(item.Name);
+                    StatusChanged?.Invoke(this, new StatusChangedEventArgs(
+                        $"Error deleting '{item.Name}': {ex.Message}"));
                 }
             }
 
@@ -291,6 +293,27 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
         }
 
         return result;
+    }
+
+    private void HandleFluentFtpException(FtpCommandException ex, string itemName, DeleteResult result)
+    {
+        var code = ex.CompletionCode;
+        var reason = code switch
+        {
+            "550" => "Access denied or file/folder not found",
+            "553" => "File name not allowed",
+            "450" => "File busy or locked",
+            "451" => "Server error during operation",
+            "502" => "Command not implemented on server",
+            _ => $"FTP error {code}: {ex.Message}"
+        };
+
+        StaticFileLogger.LogWarning($"FTP delete denied for '{itemName}': {code} - {ex.Message}");
+        StatusChanged?.Invoke(this, new StatusChangedEventArgs(
+            $"Cannot delete '{itemName}': {reason}"));
+
+        result.FailCount++;
+        result.FailedItems.Add(itemName);
     }
 
     private async Task UploadDirectoryAsync(
@@ -395,24 +418,6 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
             currentItem++;
             progress.Report((double)currentItem / totalItems * 100);
         }
-    }
-
-    private void HandleFtpException(FtpWebResponse ftpResponse, string itemName, DeleteResult result)
-    {
-        if (ftpResponse.StatusCode == FtpStatusCode.ActionNotTakenFileUnavailable ||
-            ftpResponse.StatusCode == FtpStatusCode.ActionNotTakenFilenameNotAllowed)
-        {
-            var errorMessage = $"Access denied for '{itemName}'";
-            StaticFileLogger.LogWarning(errorMessage);
-            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Cannot delete '{itemName}': Access denied"));
-        }
-        else
-        {
-            StaticFileLogger.LogError($"FTP error deleting {itemName}: {ftpResponse.StatusDescription}");
-        }
-
-        result.FailCount++;
-        result.FailedItems.Add(itemName);
     }
 
     public void Dispose()
