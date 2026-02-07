@@ -62,10 +62,7 @@ internal sealed partial class App : Application
                 desktop.MainWindow = _serviceProvider.GetRequiredService<MainWindow>();
                 desktop.Exit += OnExit;
 
-                if (!Design.IsDesignMode)
-                {
-                    StaticFileLogger.LogInformation("Application initialized successfully");
-                }
+                StaticFileLogger.LogInformation("Application initialized successfully");
             }
 
             base.OnFrameworkInitializationCompleted();
@@ -76,6 +73,7 @@ internal sealed partial class App : Application
             {
                 StaticFileLogger.LogException(ex, "Application startup failed");
             }
+
             throw;
         }
     }
