@@ -6,7 +6,6 @@ namespace WhisperFTPApp.Data;
 public sealed class AppDbContext : DbContext
 {
     public DbSet<FtpConnectionEntity> FtpConnections { get; set; } = null!;
-    public DbSet<SettingsEntity> Settings { get; set; } = null!;
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
@@ -19,7 +18,6 @@ public sealed class AppDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         ConfigureFtpConnectionEntity(modelBuilder);
-        ConfigureSettingsEntity(modelBuilder);
     }
 
     private static void ConfigureFtpConnectionEntity(ModelBuilder modelBuilder)
@@ -36,23 +34,6 @@ public sealed class AppDbContext : DbContext
             entity.Property(e => e.LastUsed).IsRequired();
 
             entity.HasIndex(e => e.Address);
-        });
-    }
-
-    private static void ConfigureSettingsEntity(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<SettingsEntity>(entity =>
-        {
-            entity.ToTable("Settings");
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).ValueGeneratedOnAdd();
-            entity.Property(e => e.BackgroundPathImage).IsRequired().HasMaxLength(500);
-
-            entity.HasData(new SettingsEntity
-            {
-                Id = 1,
-                BackgroundPathImage = "/Assets/Image (3).jpg"
-            });
         });
     }
 }

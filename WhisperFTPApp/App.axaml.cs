@@ -28,7 +28,7 @@ internal sealed partial class App : Application
             {
                 StaticFileLogger.LogInformation("Application initializing...");
                 LocalizationService.Instance.SetLanguage("en");
-                StaticFileLogger.LogInformation("Language set successfully");
+                StaticFileLogger.LogInformation("Default language set successfully");
             }
             catch (Exception ex)
             {
@@ -54,6 +54,7 @@ internal sealed partial class App : Application
             if (!Design.IsDesignMode)
             {
                 InitializeDatabase();
+                LoadSavedLanguage();
                 _ = InitializeServicesAsync();
             }
 
@@ -99,6 +100,27 @@ internal sealed partial class App : Application
         {
             StaticFileLogger.LogException(dbEx, "Database initialization failed");
             throw;
+        }
+    }
+
+    private void LoadSavedLanguage()
+    {
+        if (_serviceProvider == null) return;
+
+        try
+        {
+            var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
+            var language = settingsService.LoadLanguageSettingAsync().GetAwaiter().GetResult();
+
+            if (!string.IsNullOrWhiteSpace(language))
+            {
+                LocalizationService.Instance.SetLanguage(language);
+                StaticFileLogger.LogInformation($"Saved language restored: {language}");
+            }
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogException(ex, "Error loading saved language");
         }
     }
 

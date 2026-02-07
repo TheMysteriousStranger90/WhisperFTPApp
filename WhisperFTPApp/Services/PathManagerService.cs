@@ -5,19 +5,14 @@ namespace WhisperFTPApp.Services;
 
 internal sealed class PathManagerService : IPathManager
 {
-    private readonly Lazy<string> _appDataDirectory;
-
-    public PathManagerService()
+    private readonly Lazy<string> _appDataDirectory = new(() =>
     {
-        _appDataDirectory = new Lazy<string>(() =>
-        {
-            var appDataPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "AzioWhisperFTP");
-            Directory.CreateDirectory(appDataPath);
-            return appDataPath;
-        });
-    }
+        var appDataPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "AzioWhisperFTP");
+        Directory.CreateDirectory(appDataPath);
+        return appDataPath;
+    });
 
     public string AppDataDirectory => _appDataDirectory.Value;
 
@@ -34,5 +29,12 @@ internal sealed class PathManagerService : IPathManager
         Directory.CreateDirectory(logsDirectory);
         var timestamp = DateTime.Now.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
         return Path.Combine(logsDirectory, $"aziowhisperFTP_{timestamp}.log");
+    }
+
+    public string GetSettingsFilePath()
+    {
+        var dataDirectory = Path.Combine(AppDataDirectory, "Data");
+        Directory.CreateDirectory(dataDirectory);
+        return Path.Combine(dataDirectory, "settings.json");
     }
 }

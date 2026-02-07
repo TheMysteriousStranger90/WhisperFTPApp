@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using WhisperFTPApp.Constants;
 using WhisperFTPApp.Data;
 using WhisperFTPApp.Logger;
@@ -7,16 +8,29 @@ using WhisperFTPApp.Services.Interfaces;
 
 namespace WhisperFTPApp.Services;
 
-internal sealed class SettingsService : ISettingsService
+internal sealed class SettingsService : ISettingsService, IDisposable
 {
     private readonly IDbContextFactory<AppDbContext> _contextFactory;
     private readonly ICredentialEncryption _encryption;
+    private readonly string _settingsFilePath;
+    private readonly SemaphoreSlim _fileLock = new(1, 1);
 
-    public SettingsService(IDbContextFactory<AppDbContext> contextFactory, ICredentialEncryption encryption)
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true
+    };
+
+    public SettingsService(
+        IDbContextFactory<AppDbContext> contextFactory,
+        ICredentialEncryption encryption,
+        IPathManager pathManager)
     {
         _contextFactory = contextFactory;
         _encryption = encryption;
+        _settingsFilePath = pathManager.GetSettingsFilePath();
     }
+
+    // ── FTP Connections (Database) ──────────────────────────────────
 
     public async Task SaveConnectionsAsync(IEnumerable<FtpConnectionEntity> connections,
         CancellationToken cancellationToken = default)
@@ -103,41 +117,101 @@ internal sealed class SettingsService : ISettingsService
         }
     }
 
+    // ── Background (settings.json) ─────────────────────────────────
+
     public async Task SaveBackgroundSettingAsync(string backgroundPath, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(backgroundPath);
 
         var dbPath = ConvertToDbPath(backgroundPath);
 
-        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        var settings = await LoadAppSettingsAsync(cancellationToken).ConfigureAwait(false);
+        settings.BackgroundPathImage = dbPath;
+        await SaveAppSettingsAsync(settings, cancellationToken).ConfigureAwait(false);
 
-        var settings = await context.Settings.FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-        if (settings == null)
-        {
-            settings = new SettingsEntity { BackgroundPathImage = dbPath };
-            context.Settings.Add(settings);
-        }
-        else
-        {
-            settings.BackgroundPathImage = dbPath;
-        }
-
-        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         StaticFileLogger.LogInformation($"Background path saved: {dbPath}");
     }
 
     public async Task<string> LoadBackgroundSettingAsync(CancellationToken cancellationToken = default)
     {
-        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-
-        var settings = await context.Settings.FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-        var dbPath = settings?.BackgroundPathImage ?? "/Assets/Image (3).jpg";
+        var settings = await LoadAppSettingsAsync(cancellationToken).ConfigureAwait(false);
+        var dbPath = settings.BackgroundPathImage;
 
         var avaresPath = ConvertToAvaresPath(dbPath);
         StaticFileLogger.LogInformation($"Background path loaded: {avaresPath}");
 
         return avaresPath;
     }
+
+    // ── Language (settings.json) ───────────────────────────────────
+
+    public async Task SaveLanguageSettingAsync(string language, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(language);
+
+        var settings = await LoadAppSettingsAsync(cancellationToken).ConfigureAwait(false);
+        settings.Language = language;
+        await SaveAppSettingsAsync(settings, cancellationToken).ConfigureAwait(false);
+
+        StaticFileLogger.LogInformation($"Language saved: {language}");
+    }
+
+    public async Task<string> LoadLanguageSettingAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await LoadAppSettingsAsync(cancellationToken).ConfigureAwait(false);
+        StaticFileLogger.LogInformation($"Language loaded: {settings.Language}");
+        return settings.Language;
+    }
+
+    // ── JSON file helpers ──────────────────────────────────────────
+
+    private async Task<AppSettings> LoadAppSettingsAsync(CancellationToken cancellationToken)
+    {
+        await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!File.Exists(_settingsFilePath))
+                return new AppSettings();
+
+            var json = await File.ReadAllTextAsync(_settingsFilePath, cancellationToken).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Error loading settings.json: {ex.Message}");
+            return new AppSettings();
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
+    private async Task SaveAppSettingsAsync(AppSettings settings, CancellationToken cancellationToken)
+    {
+        await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var json = JsonSerializer.Serialize(settings, JsonOptions);
+            await File.WriteAllTextAsync(_settingsFilePath, json, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Error saving settings.json: {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
+    public void Dispose()
+    {
+        _fileLock.Dispose();
+    }
+
+    // ── Path converters ────────────────────────────────────────────
 
     private static string ConvertToDbPath(string path)
     {
