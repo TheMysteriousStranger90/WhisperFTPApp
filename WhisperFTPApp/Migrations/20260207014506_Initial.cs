@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace WhisperFTPApp.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialNewMigr : Migration
+    public partial class Initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -17,10 +17,10 @@ namespace WhisperFTPApp.Migrations
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    Name = table.Column<string>(type: "TEXT", nullable: false),
-                    Address = table.Column<string>(type: "TEXT", nullable: false),
-                    Username = table.Column<string>(type: "TEXT", nullable: false),
-                    Password = table.Column<string>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
+                    Address = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
+                    Username = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
+                    Password = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: false),
                     LastUsed = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
@@ -34,7 +34,7 @@ namespace WhisperFTPApp.Migrations
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    BackgroundPathImage = table.Column<string>(type: "TEXT", nullable: false)
+                    BackgroundPathImage = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -42,14 +42,14 @@ namespace WhisperFTPApp.Migrations
                 });
 
             migrationBuilder.InsertData(
-                table: "FtpConnections",
-                columns: new[] { "Id", "Address", "LastUsed", "Name", "Password", "Username" },
-                values: new object[] { 1, "ftp://demo.wftpserver.com", new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "ftp://demo.wftpserver.com", "demo", "demo" });
-
-            migrationBuilder.InsertData(
                 table: "Settings",
                 columns: new[] { "Id", "BackgroundPathImage" },
                 values: new object[] { 1, "/Assets/Image (3).jpg" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_FtpConnections_Address",
+                table: "FtpConnections",
+                column: "Address");
         }
 
         /// <inheritdoc />

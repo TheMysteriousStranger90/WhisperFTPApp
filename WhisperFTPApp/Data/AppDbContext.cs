@@ -36,16 +36,6 @@ public sealed class AppDbContext : DbContext
             entity.Property(e => e.LastUsed).IsRequired();
 
             entity.HasIndex(e => e.Address);
-
-            entity.HasData(new FtpConnectionEntity
-            {
-                Id = 1,
-                Name = "Demo Server",
-                Address = "ftp://demo.wftpserver.com",
-                Username = "demo",
-                Password = "demo",
-                LastUsed = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-            });
         });
     }
 
