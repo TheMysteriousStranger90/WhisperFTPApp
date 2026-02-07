@@ -24,6 +24,8 @@ public static class FileHelper
 
     public static string GetFileIcon(string extension)
     {
+        ArgumentNullException.ThrowIfNull(extension);
+
         return extension.ToUpperInvariant() switch
         {
             ".TXT" or ".LOG" or ".MD" => "📄",

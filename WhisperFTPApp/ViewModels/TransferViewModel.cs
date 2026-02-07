@@ -49,6 +49,8 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
     public async Task<TransferResult> UploadAsync(TransferRequest request,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         IsTransferring = true;
         StaticFileLogger.LogInformation($"Starting upload operation");
 
@@ -132,6 +134,8 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
     public async Task<TransferResult> DownloadAsync(TransferRequest request,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         IsTransferring = true;
         StaticFileLogger.LogInformation($"Starting download operation");
 
@@ -207,6 +211,8 @@ public sealed class TransferViewModel : ReactiveObject, IDisposable
 
     public async Task<DeleteResult> DeleteAsync(DeleteRequest request, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         IsTransferring = true;
 
         var result = new DeleteResult();

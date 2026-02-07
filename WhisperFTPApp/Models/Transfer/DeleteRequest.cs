@@ -6,6 +6,8 @@ public class DeleteRequest
 {
     public DeleteRequest(IEnumerable<FileSystemItem> items)
     {
+        ArgumentNullException.ThrowIfNull(items);
+
         foreach (var item in items)
         {
             Items.Add(item);
