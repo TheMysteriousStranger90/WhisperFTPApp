@@ -3,7 +3,7 @@
 <root>
     <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
         <xsd:element name="root" msdata:IsDataSet="true">
-            
+
         </xsd:element>
     </xsd:schema>
     <resheader name="resmimetype">
@@ -124,4 +124,94 @@
 Открытых сетей: {1}
 Сетей с открытым FTP: {2}</value>
     </data>
+    <data name="StartHybridScan" xml:space="preserve">
+    <value>Начать гибридное сканирование</value>
+</data>
+    <data name="Clear" xml:space="preserve">
+    <value>Очистить</value>
+</data>
+    <data name="HybridScanMode" xml:space="preserve">
+    <value>РЕЖИМ ГИБРИДНОГО СКАНИРОВАНИЯ</value>
+</data>
+    <data name="WiFiDiscovery" xml:space="preserve">
+    <value>✓ Обнаружение WiFi: Пассивное - находит все сети без подключения</value>
+</data>
+    <data name="FtpScanning" xml:space="preserve">
+    <value>✓ Сканирование FTP: Активное - сканирует ТОЛЬКО вашу текущую сеть</value>
+</data>
+    <data name="NetworksFound" xml:space="preserve">
+    <value>Найдено сетей</value>
+</data>
+    <data name="HostsScanned" xml:space="preserve">
+    <value>Просканировано хостов</value>
+</data>
+    <data name="FtpServers" xml:space="preserve">
+    <value>FTP серверы</value>
+</data>
+    <data name="ScanMode" xml:space="preserve">
+    <value>Режим сканирования</value>
+</data>
+    <data name="AvailableNetworksTab" xml:space="preserve">
+    <value>Доступные сети</value>
+</data>
+    <data name="CurrentNetworkTab" xml:space="preserve">
+    <value>Детали текущей сети</value>
+</data>
+    <data name="FtpServersTab" xml:space="preserve">
+    <value>FTP серверы (текущая сеть)</value>
+</data>
+    <data name="SSID" xml:space="preserve">
+    <value>SSID</value>
+</data>
+    <data name="BSSID" xml:space="preserve">
+    <value>BSSID</value>
+</data>
+    <data name="IPAddress" xml:space="preserve">
+    <value>IP адрес</value>
+</data>
+    <data name="Gateway" xml:space="preserve">
+    <value>Шлюз</value>
+</data>
+    <data name="Subnet" xml:space="preserve">
+    <value>Подсеть</value>
+</data>
+    <data name="ServerType" xml:space="preserve">
+    <value>Тип сервера</value>
+</data>
+    <data name="Anonymous" xml:space="preserve">
+    <value>Анонимный</value>
+</data>
+    <data name="Response" xml:space="preserve">
+    <value>Отклик</value>
+</data>
+    <data name="Banner" xml:space="preserve">
+    <value>Баннер</value>
+</data>
+    <data name="FoundAt" xml:space="preserve">
+    <value>Обнаружен в</value>
+</data>
+    <data name="Speed" xml:space="preserve">
+    <value>Скорость</value>
+</data>
+    <data name="TotalNetworks" xml:space="preserve">
+    <value>Всего сетей: {0}</value>
+</data>
+    <data name="InfoPassiveScan" xml:space="preserve">
+    <value>Инфо: Этот список показывает все обнаруживаемые WiFi сети. Только ваша текущая сеть сканируется на FTP серверы.</value>
+</data>
+    <data name="ViewServerDetails" xml:space="preserve">
+    <value>Посмотреть детали сервера</value>
+</data>
+    <data name="Found" xml:space="preserve">
+    <value>Найдено:</value>
+</data>
+    <data name="ServersInNetwork" xml:space="preserve">
+    <value>сервер(ов) в вашей текущей сети</value>
+</data>
+    <data name="InfoCurrentNetwork" xml:space="preserve">
+    <value>Инфо: Эти FTP серверы находятся в ВАШЕЙ текущей сети. Чтобы просканировать другие сети, сначала подключитесь к ним через настройки сети Windows.</value>
+</data>
+    <data name="TotalNetworksLabel" xml:space="preserve">
+    <value>Всего сетей:</value>
+</data>
 </root>

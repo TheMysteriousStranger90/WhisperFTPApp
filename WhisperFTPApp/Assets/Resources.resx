@@ -1,9 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 
 <root>
-    <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
         <xsd:element name="root" msdata:IsDataSet="true">
-            
+
         </xsd:element>
     </xsd:schema>
     <resheader name="resmimetype">
@@ -13,10 +14,14 @@
         <value>1.3</value>
     </resheader>
     <resheader name="reader">
-        <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+        <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral,
+            PublicKeyToken=b77a5c561934e089
+        </value>
     </resheader>
     <resheader name="writer">
-        <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+        <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral,
+            PublicKeyToken=b77a5c561934e089
+        </value>
     </resheader>
 
     <data name="Connect" xml:space="preserve">
@@ -125,4 +130,97 @@
 Open networks: {1}
 Networks with open FTP: {2}</value>
     </data>
+    <data name="StartHybridScan" xml:space="preserve">
+    <value>Start Hybrid Scan</value>
+</data>
+    <data name="Clear" xml:space="preserve">
+    <value>Clear</value>
+</data>
+    <data name="HybridScanMode" xml:space="preserve">
+    <value>HYBRID SCAN MODE</value>
+</data>
+    <data name="WiFiDiscovery" xml:space="preserve">
+    <value>✓ WiFi Discovery: Passive - finds all networks without connecting</value>
+</data>
+    <data name="FtpScanning" xml:space="preserve">
+    <value>✓ FTP Scanning: Active - scans ONLY your current network</value>
+</data>
+    <data name="NetworksFound" xml:space="preserve">
+    <value>Networks Found</value>
+</data>
+    <data name="HostsScanned" xml:space="preserve">
+    <value>Hosts Scanned</value>
+</data>
+    <data name="FtpServers" xml:space="preserve">
+    <value>FTP Servers</value>
+</data>
+    <data name="ScanMode" xml:space="preserve">
+    <value>Scan Mode</value>
+</data>
+    <data name="AvailableNetworksTab" xml:space="preserve">
+    <value>Available Networks</value>
+</data>
+    <data name="CurrentNetworkTab" xml:space="preserve">
+    <value>Current Network Details</value>
+</data>
+    <data name="FtpServersTab" xml:space="preserve">
+    <value>FTP Servers (Current Network)</value>
+</data>
+    <data name="SSID" xml:space="preserve">
+    <value>SSID</value>
+</data>
+    <data name="BSSID" xml:space="preserve">
+    <value>BSSID</value>
+</data>
+    <data name="IPAddress" xml:space="preserve">
+    <value>IP Address</value>
+</data>
+    <data name="Gateway" xml:space="preserve">
+    <value>Gateway</value>
+</data>
+    <data name="Subnet" xml:space="preserve">
+    <value>Subnet</value>
+</data>
+    <data name="ServerType" xml:space="preserve">
+    <value>Server Type</value>
+</data>
+    <data name="Anonymous" xml:space="preserve">
+    <value>Anonymous</value>
+</data>
+    <data name="SSL" xml:space="preserve">
+    <value>SSL</value>
+</data>
+    <data name="Response" xml:space="preserve">
+    <value>Response</value>
+</data>
+    <data name="Banner" xml:space="preserve">
+    <value>Banner</value>
+</data>
+    <data name="FoundAt" xml:space="preserve">
+    <value>Found At</value>
+</data>
+    <data name="Speed" xml:space="preserve">
+    <value>Speed</value>
+</data>
+    <data name="TotalNetworks" xml:space="preserve">
+    <value>Total Networks: {0}</value>
+</data>
+    <data name="InfoPassiveScan" xml:space="preserve">
+    <value>Info: This list shows all discoverable WiFi networks. Only your current network is scanned for FTP servers.</value>
+</data>
+    <data name="ViewServerDetails" xml:space="preserve">
+    <value>View Server Details</value>
+</data>
+    <data name="Found" xml:space="preserve">
+    <value>Found:</value>
+</data>
+    <data name="ServersInNetwork" xml:space="preserve">
+    <value>server(s) in your current network</value>
+</data>
+    <data name="InfoCurrentNetwork" xml:space="preserve">
+    <value>Info: These FTP servers are in YOUR current network. To scan other networks, connect to them first using Windows network settings.</value>
+</data>
+<data name="TotalNetworksLabel" xml:space="preserve">
+    <value>Total Networks:</value>
+</data>
 </root>
