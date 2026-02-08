@@ -810,13 +810,113 @@ internal sealed class FtpService : IFtpService, IDisposable
         client.Config.TransferChunkSize = configuration.BufferSize;
         client.Config.LocalFileBufferSize = configuration.BufferSize;
 
-        client.Config.EncryptionMode = configuration.EnableSsl
-            ? FtpEncryptionMode.Explicit
-            : FtpEncryptionMode.None;
-
         if (configuration.EnableSsl)
         {
-            client.Config.ValidateAnyCertificate = true;
+            client.Config.EncryptionMode = FtpEncryptionMode.Explicit;
+
+            client.Config.ValidateAnyCertificate = configuration.AllowInvalidCertificates;
+
+            if (!configuration.AllowInvalidCertificates)
+            {
+                client.ValidateCertificate += (control, e) =>
+                {
+                    if (e.PolicyErrors == System.Net.Security.SslPolicyErrors.None)
+                    {
+                        e.Accept = true;
+                        return;
+                    }
+
+                    if (e.PolicyErrors.HasFlag(System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch))
+                    {
+                        StaticFileLogger.LogError(
+                            $"Certificate hostname mismatch! Expected: {uri.Host}, " +
+                            $"Subject: {e.Certificate?.Subject}");
+                        e.Accept = false;
+                        return;
+                    }
+
+                    if (e.PolicyErrors.HasFlag(System.Net.Security.SslPolicyErrors.RemoteCertificateNotAvailable))
+                    {
+                        StaticFileLogger.LogError("Remote certificate not available");
+                        e.Accept = false;
+                        return;
+                    }
+
+                    if (e.PolicyErrors.HasFlag(System.Net.Security.SslPolicyErrors.RemoteCertificateChainErrors)
+                        && e.Chain != null)
+                    {
+                        var toleratedFlags = new[]
+                        {
+                            System.Security.Cryptography.X509Certificates.X509ChainStatusFlags.NoError,
+                            System.Security.Cryptography.X509Certificates.X509ChainStatusFlags.UntrustedRoot,
+                            System.Security.Cryptography.X509Certificates.X509ChainStatusFlags.PartialChain,
+                            System.Security.Cryptography.X509Certificates.X509ChainStatusFlags.RevocationStatusUnknown,
+                            System.Security.Cryptography.X509Certificates.X509ChainStatusFlags.OfflineRevocation,
+                            System.Security.Cryptography.X509Certificates.X509ChainStatusFlags.NotTimeValid,
+                        };
+
+                        var criticalErrors = e.Chain.ChainStatus
+                            .Where(s => !toleratedFlags.Contains(s.Status))
+                            .ToList();
+
+                        if (criticalErrors.Count == 0)
+                        {
+                            if (e.Certificate != null)
+                            {
+                                var cert2 =
+                                    new System.Security.Cryptography.X509Certificates.X509Certificate2(e.Certificate);
+
+                                if (cert2.NotBefore <= DateTime.UtcNow && cert2.NotAfter >= DateTime.UtcNow)
+                                {
+                                    var chainWarnings = e.Chain.ChainStatus
+                                        .Where(s => s.Status != System.Security.Cryptography.X509Certificates
+                                            .X509ChainStatusFlags.NoError)
+                                        .Select(s => s.Status.ToString());
+
+                                    StaticFileLogger.LogInformation(
+                                        $"Certificate accepted. Leaf cert valid: " +
+                                        $"{cert2.NotBefore:yyyy-MM-dd} - {cert2.NotAfter:yyyy-MM-dd}. " +
+                                        $"Tolerated chain warnings: [{string.Join(", ", chainWarnings)}]. " +
+                                        $"Subject: {e.Certificate.Subject}");
+                                    e.Accept = true;
+                                    return;
+                                }
+
+                                StaticFileLogger.LogError(
+                                    $"Server (leaf) certificate expired! " +
+                                    $"Valid: {cert2.NotBefore:yyyy-MM-dd} - {cert2.NotAfter:yyyy-MM-dd}, " +
+                                    $"Subject: {cert2.Subject}");
+                                e.Accept = false;
+                                return;
+                            }
+
+                            e.Accept = false;
+                            return;
+                        }
+
+                        var errorDetails = string.Join(", ",
+                            criticalErrors.Select(s => $"{s.Status}: {s.StatusInformation}"));
+                        StaticFileLogger.LogError(
+                            $"Certificate chain has critical errors: {errorDetails}. " +
+                            $"Subject: {e.Certificate?.Subject}, Issuer: {e.Certificate?.Issuer}");
+                        e.Accept = false;
+                        return;
+                    }
+
+                    StaticFileLogger.LogError($"Certificate rejected: {e.PolicyErrors}");
+                    e.Accept = false;
+                };
+            }
+        }
+        else
+        {
+            client.Config.EncryptionMode = FtpEncryptionMode.None;
+
+            if (!configuration.Username.Equals("anonymous", StringComparison.OrdinalIgnoreCase))
+            {
+                StaticFileLogger.LogWarning(
+                    "WARNING: Connecting without SSL/TLS. Credentials will be transmitted in plain text!");
+            }
         }
 
         client.Config.DataConnectionType = configuration.UsePassive
@@ -828,7 +928,8 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         StaticFileLogger.LogInformation(
             $"Client created - Host: {uri.Host}, Port: {configuration.Port}, SSL: {configuration.EnableSsl}, " +
-            $"Passive: {configuration.UsePassive}, BufferSize: {configuration.BufferSize}");
+            $"Passive: {configuration.UsePassive}, BufferSize: {configuration.BufferSize}, " +
+            $"CertValidation: {!configuration.AllowInvalidCertificates}");
 
         return client;
     }
