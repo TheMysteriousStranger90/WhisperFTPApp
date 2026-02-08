@@ -52,29 +52,6 @@ namespace WhisperFTPApp.Migrations
 
                     b.ToTable("FtpConnections", (string)null);
                 });
-
-            modelBuilder.Entity("WhisperFTPApp.Models.SettingsEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("BackgroundPathImage")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Settings", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            BackgroundPathImage = "/Assets/Image (3).jpg"
-                        });
-                });
 #pragma warning restore 612, 618
         }
     }

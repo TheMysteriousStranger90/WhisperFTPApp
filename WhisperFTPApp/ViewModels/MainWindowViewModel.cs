@@ -27,6 +27,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         IFtpService ftpService,
         ISettingsService settingsService,
         IBackgroundService backgroundService,
+        ICredentialEncryption credentialEncryption,
         IWifiScannerService scannerService)
     {
         ArgumentNullException.ThrowIfNull(ftpService);
@@ -34,7 +35,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
         ArgumentNullException.ThrowIfNull(backgroundService);
         ArgumentNullException.ThrowIfNull(scannerService);
 
-        _connectionViewModel = new ConnectionViewModel(ftpService, settingsService);
+        _connectionViewModel = new ConnectionViewModel(ftpService, settingsService, credentialEncryption);
         _localFileViewModel = new LocalFileViewModel();
         _remoteFileViewModel = new RemoteFileViewModel(ftpService, () => _connectionViewModel.CreateConfiguration());
         _transferViewModel = new TransferViewModel(ftpService, () => _connectionViewModel.CreateConfiguration());

@@ -11,7 +11,7 @@ using WhisperFTPApp.Data;
 namespace WhisperFTPApp.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260207014506_Initial")]
+    [Migration("20260208122119_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -54,29 +54,6 @@ namespace WhisperFTPApp.Migrations
                     b.HasIndex("Address");
 
                     b.ToTable("FtpConnections", (string)null);
-                });
-
-            modelBuilder.Entity("WhisperFTPApp.Models.SettingsEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("BackgroundPathImage")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Settings", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            BackgroundPathImage = "/Assets/Image (3).jpg"
-                        });
                 });
 #pragma warning restore 612, 618
         }

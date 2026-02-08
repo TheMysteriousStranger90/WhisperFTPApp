@@ -29,63 +29,76 @@
 
         <!-- Connection Panel -->
         <Border Classes="panel" DockPanel.Dock="Top" Padding="12" Margin="0,0,0,16">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-                <TextBox Width="240" Watermark="{DynamicResource FtpAddressWatermark}"
-                         Text="{Binding Connection.FtpAddress}" />
-                <TextBox Width="130" Watermark="{DynamicResource Username}"
-                         Text="{Binding Connection.Username}" />
-                <TextBox Width="130" Watermark="{DynamicResource Password}" PasswordChar="•"
-                         Text="{Binding Connection.Password}" />
-                <TextBox Width="55" Watermark="{DynamicResource Port}"
-                         Text="{Binding Connection.Port}" />
-                <Button Command="{Binding Connection.ConnectCommand}"
-                        IsEnabled="{Binding !Connection.IsConnected}" Padding="10,6">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <PathIcon Data="{StaticResource RefreshIcon}" Width="18" Height="18" />
-                        <TextBlock Text="{DynamicResource Connect}" FontSize="13" />
-                    </StackPanel>
-                </Button>
-                <Button Command="{Binding Connection.DisconnectCommand}"
-                        IsEnabled="{Binding Connection.IsConnected}" Padding="10,6">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <PathIcon Data="{StaticResource DisconnectIcon}" Width="18" Height="18" />
-                        <TextBlock Text="{DynamicResource Disconnect}" FontSize="13" />
-                    </StackPanel>
-                </Button>
-                <Button Command="{Binding Connection.CleanCommand}" Padding="10,6">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <PathIcon Data="{StaticResource CleanIcon}" Width="18" Height="18" />
-                        <TextBlock Text="{DynamicResource Clean}" FontSize="13" />
-                    </StackPanel>
-                </Button>
-                <Button Command="{Binding Connection.ShowRecentConnectionsCommand}" Padding="10,6">
-                    <PathIcon Data="{StaticResource ListOfConnections}" Width="18" Height="18" />
-                    <Button.Flyout>
-                        <Flyout>
-                            <ListBox ItemsSource="{Binding Connection.RecentConnections}"
-                                     SelectionMode="Single"
-                                     SelectedItem="{Binding Connection.SelectedRecentConnection}">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid ColumnDefinitions="*, Auto">
-                                            <TextBlock Text="{Binding Address}"
-                                                       VerticalAlignment="Center" />
-                                            <Button Grid.Column="1"
-                                                    Command="{Binding $parent[Window].((viewModels:MainWindowViewModel)DataContext).Connection.DeleteConnectionCommand}"
-                                                    CommandParameter="{Binding}"
-                                                    Background="Transparent"
-                                                    Margin="8,0,0,0">
-                                                <PathIcon Data="{StaticResource DeleteIcon}"
-                                                          Width="16"
-                                                          Height="16" />
-                                            </Button>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Flyout>
-                    </Button.Flyout>
-                </Button>
+            <StackPanel Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBox Width="240" Watermark="{DynamicResource FtpAddressWatermark}"
+                             Text="{Binding Connection.FtpAddress}" />
+                    <TextBox Width="130" Watermark="{DynamicResource Username}"
+                             Text="{Binding Connection.Username}" />
+                    <TextBox Width="130" Watermark="{DynamicResource Password}" PasswordChar="•"
+                             Text="{Binding Connection.Password}" />
+                    <TextBox Width="55" Watermark="{DynamicResource Port}"
+                             Text="{Binding Connection.Port}" />
+                    <Button Command="{Binding Connection.ConnectCommand}"
+                            IsEnabled="{Binding !Connection.IsConnected}" Padding="10,6">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Data="{StaticResource RefreshIcon}" Width="18" Height="18" />
+                            <TextBlock Text="{DynamicResource Connect}" FontSize="13" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding Connection.DisconnectCommand}"
+                            IsEnabled="{Binding Connection.IsConnected}" Padding="10,6">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Data="{StaticResource DisconnectIcon}" Width="18" Height="18" />
+                            <TextBlock Text="{DynamicResource Disconnect}" FontSize="13" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding Connection.CleanCommand}" Padding="10,6">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Data="{StaticResource CleanIcon}" Width="18" Height="18" />
+                            <TextBlock Text="{DynamicResource Clean}" FontSize="13" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding Connection.ShowRecentConnectionsCommand}" Padding="10,6">
+                        <PathIcon Data="{StaticResource ListOfConnections}" Width="18" Height="18" />
+                        <Button.Flyout>
+                            <Flyout>
+                                <ListBox ItemsSource="{Binding Connection.RecentConnections}"
+                                         SelectionMode="Single"
+                                         SelectedItem="{Binding Connection.SelectedRecentConnection}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnDefinitions="*, Auto">
+                                                <TextBlock Text="{Binding Address}"
+                                                           VerticalAlignment="Center" />
+                                                <Button Grid.Column="1"
+                                                        Command="{Binding $parent[Window].((viewModels:MainWindowViewModel)DataContext).Connection.DeleteConnectionCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="Transparent"
+                                                        Margin="8,0,0,0">
+                                                    <PathIcon Data="{StaticResource DeleteIcon}"
+                                                              Width="16"
+                                                              Height="16" />
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+                <!-- SSL Options Row -->
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <CheckBox Content="SSL/TLS"
+                              IsChecked="{Binding Connection.EnableSsl}" />
+                    <CheckBox Content="Passive"
+                              IsChecked="{Binding Connection.UsePassive}" />
+                    <CheckBox Content="Allow invalid/expired certificates"
+                              IsChecked="{Binding Connection.AllowInvalidCertificates}"
+                              Foreground="OrangeRed"
+                              ToolTip.Tip="WARNING: Disables certificate validation. Use only for servers with known expired certificates." />
+                </StackPanel>
             </StackPanel>
         </Border>
 

@@ -10,7 +10,7 @@ public sealed class FtpConfiguration
     public required string Password { get; init; }
     public int Port { get; init; } = AppConstants.DefaultFtpPort;
     public int Timeout { get; init; } = AppConstants.DefaultTimeout;
-    public bool EnableSsl { get; init; }
+    public bool EnableSsl { get; init; } = true;
     public bool UsePassive { get; init; } = true;
     public bool UseBinary { get; init; } = true;
     public bool KeepAlive { get; init; } = true;
@@ -23,11 +23,13 @@ public sealed class FtpConfiguration
         System.Net.Security.AuthenticationLevel.MutualAuthRequested;
 
     public System.Security.Principal.TokenImpersonationLevel ImpersonationLevel { get; init; } =
-        System.Security.Principal.TokenImpersonationLevel.Delegation;
+        System.Security.Principal.TokenImpersonationLevel.Identification;
 
     public int BufferSize { get; init; } = AppConstants.DefaultBufferSize;
     public int MaxRetries { get; init; } = AppConstants.DefaultMaxRetries;
     public int RetryDelay { get; init; } = AppConstants.DefaultRetryDelay;
+
+    public bool AllowInvalidCertificates { get; init; }
 
     public FtpConfiguration()
     {
@@ -39,7 +41,7 @@ public sealed class FtpConfiguration
         string password,
         int port = 21,
         int timeout = 10000,
-        bool enableSsl = false,
+        bool enableSsl = true,
         bool usePassive = true,
         bool keepAlive = true)
     {
@@ -68,7 +70,8 @@ public sealed class FtpConfiguration
             EnableSsl = true,
             UsePassive = true,
             KeepAlive = true,
-            UseBinary = true
+            UseBinary = true,
+            AllowInvalidCertificates = false
         };
     }
 
@@ -119,6 +122,13 @@ public sealed class FtpConfiguration
             return false;
         }
 
+        if (!EnableSsl && !Username.Equals("anonymous", StringComparison.OrdinalIgnoreCase))
+        {
+            errorMessage = "SSL is strongly recommended when using credentials. " +
+                           "Credentials will be sent in plain text.";
+            return true;
+        }
+
         errorMessage = string.Empty;
         return true;
     }
@@ -144,7 +154,8 @@ public sealed class FtpConfiguration
             ImpersonationLevel = this.ImpersonationLevel,
             BufferSize = this.BufferSize,
             MaxRetries = this.MaxRetries,
-            RetryDelay = this.RetryDelay
+            RetryDelay = this.RetryDelay,
+            AllowInvalidCertificates = this.AllowInvalidCertificates
         };
     }
 
@@ -169,7 +180,8 @@ public sealed class FtpConfiguration
             ImpersonationLevel = this.ImpersonationLevel,
             BufferSize = this.BufferSize,
             MaxRetries = this.MaxRetries,
-            RetryDelay = this.RetryDelay
+            RetryDelay = this.RetryDelay,
+            AllowInvalidCertificates = this.AllowInvalidCertificates
         };
     }
 
@@ -194,7 +206,8 @@ public sealed class FtpConfiguration
             ImpersonationLevel = this.ImpersonationLevel,
             BufferSize = this.BufferSize,
             MaxRetries = this.MaxRetries,
-            RetryDelay = this.RetryDelay
+            RetryDelay = this.RetryDelay,
+            AllowInvalidCertificates = this.AllowInvalidCertificates
         };
     }
 }

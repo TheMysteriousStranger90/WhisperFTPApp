@@ -16,6 +16,7 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
 {
     private readonly IFtpService _ftpService;
     private readonly ISettingsService _settingsService;
+    private readonly ICredentialEncryption _credentialEncryption;
 
     private string _ftpAddress = string.Empty;
     private string _username = string.Empty;
@@ -31,11 +32,16 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
     private int _retryDelay = AppConstants.DefaultRetryDelay;
     private FtpConnectionEntity? _selectedRecentConnection;
     private readonly ObservableCollection<FtpConnectionEntity> _recentConnections = new();
+    private bool _allowInvalidCertificates;
 
-    public ConnectionViewModel(IFtpService ftpService, ISettingsService settingsService)
+    public ConnectionViewModel(
+        IFtpService ftpService,
+        ISettingsService settingsService,
+        ICredentialEncryption credentialEncryption)
     {
         _ftpService = ftpService;
         _settingsService = settingsService;
+        _credentialEncryption = credentialEncryption;
 
         ConnectCommand = ReactiveCommand.CreateFromTask(
             ConnectAsync,
@@ -125,6 +131,12 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
         set => this.RaiseAndSetIfChanged(ref _retryDelay, value);
     }
 
+    public bool AllowInvalidCertificates
+    {
+        get => _allowInvalidCertificates;
+        set => this.RaiseAndSetIfChanged(ref _allowInvalidCertificates, value);
+    }
+
     public FtpConnectionEntity? SelectedRecentConnection
     {
         get => _selectedRecentConnection;
@@ -183,7 +195,8 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
             KeepAlive = true,
             BufferSize = BufferSize,
             MaxRetries = MaxRetries,
-            RetryDelay = RetryDelay
+            RetryDelay = RetryDelay,
+            AllowInvalidCertificates = AllowInvalidCertificates
         };
     }
 
@@ -258,7 +271,7 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
                 Name = FtpAddress,
                 Address = FtpAddress,
                 Username = Username,
-                Password = Password,
+                Password = _credentialEncryption.Encrypt(Password),
                 LastUsed = DateTime.UtcNow
             };
 
@@ -283,6 +296,31 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
         }
     }
 
+    private async Task SwitchConnectionAsync(FtpConnectionEntity connection,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (IsConnected)
+            {
+                await DisconnectAsync(cancellationToken).ConfigureAwait(true);
+            }
+
+            FtpAddress = connection.Address;
+            Username = connection.Username;
+            Password = _credentialEncryption.Decrypt(connection.Password);
+            await ConnectAsync(cancellationToken).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Error switching connection: {ex.Message}"));
+        }
+        finally
+        {
+            SelectedRecentConnection = null;
+        }
+    }
+
     private async Task LoadRecentConnectionsAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -299,31 +337,6 @@ public sealed class ConnectionViewModel : ReactiveObject, IDisposable
         {
             StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Error loading connections: {ex.Message}"));
             _recentConnections.Clear();
-        }
-    }
-
-    private async Task SwitchConnectionAsync(FtpConnectionEntity connection,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            if (IsConnected)
-            {
-                await DisconnectAsync(cancellationToken).ConfigureAwait(true);
-            }
-
-            FtpAddress = connection.Address;
-            Username = connection.Username;
-            Password = connection.Password;
-            await ConnectAsync(cancellationToken).ConfigureAwait(true);
-        }
-        catch (Exception ex)
-        {
-            StatusChanged?.Invoke(this, new StatusChangedEventArgs($"Error switching connection: {ex.Message}"));
-        }
-        finally
-        {
-            SelectedRecentConnection = null;
         }
     }
 
