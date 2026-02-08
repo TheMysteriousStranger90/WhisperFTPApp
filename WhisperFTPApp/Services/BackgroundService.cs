@@ -1,4 +1,5 @@
 ﻿using System.Reactive.Subjects;
+using WhisperFTPApp.Constants;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Services.Interfaces;
 
@@ -9,6 +10,8 @@ public class BackgroundService : IBackgroundService, IDisposable
     private readonly ISettingsService _settingsService;
     private readonly BehaviorSubject<string> _backgroundChanged;
     private bool _disposed;
+    private bool _initialized;
+    private readonly SemaphoreSlim _initLock = new(1, 1);
 
     public string CurrentBackground => _backgroundChanged.Value;
     public IObservable<string> BackgroundChanged => _backgroundChanged;
@@ -16,30 +19,41 @@ public class BackgroundService : IBackgroundService, IDisposable
     public BackgroundService(ISettingsService settingsService)
     {
         _settingsService = settingsService;
-        _backgroundChanged =
-            new BehaviorSubject<string>("avares://AzioWhisperFTP/Assets/Image (3).jpg");
-        _ = LoadInitialBackground();
+        _backgroundChanged = new BehaviorSubject<string>(AppConstants.DefaultBackground);
     }
 
-    private async Task LoadInitialBackground()
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        if (_initialized) return;
+
+        await _initLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var background = await _settingsService.LoadBackgroundSettingAsync().ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(background) && !background.StartsWith("avares://", StringComparison.Ordinal))
+            if (_initialized) return;
+
+            var background = await _settingsService.LoadBackgroundSettingAsync(cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(background))
             {
-                background = $"avares://AzioWhisperFTP{background}";
+                if (!background.StartsWith("avares://", StringComparison.Ordinal))
+                {
+                    background = $"{AppConstants.AvaresPrefix}{background}";
+                }
+                _backgroundChanged.OnNext(background);
             }
 
-            _backgroundChanged.OnNext(background);
+            _initialized = true;
         }
         catch (Exception ex)
         {
             StaticFileLogger.LogError($"[BackgroundService] Error loading background: {ex.Message}");
         }
+        finally
+        {
+            _initLock.Release();
+        }
     }
 
-    public async Task ChangeBackgroundAsync(string path)
+    public async Task ChangeBackgroundAsync(string path, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -50,9 +64,9 @@ public class BackgroundService : IBackgroundService, IDisposable
         {
             var dbPath = path.StartsWith("avares://", StringComparison.Ordinal)
                 ? path
-                : $"avares://AzioWhisperFTP{path}";
+                : $"{AppConstants.AvaresPrefix}{path}";
             StaticFileLogger.LogInformation($"[BackgroundService] Changing background to: {dbPath}");
-            await _settingsService.SaveBackgroundSettingAsync(dbPath).ConfigureAwait(false);
+            await _settingsService.SaveBackgroundSettingAsync(dbPath, cancellationToken).ConfigureAwait(false);
             _backgroundChanged.OnNext(dbPath);
         }
         catch (Exception ex)
@@ -74,6 +88,7 @@ public class BackgroundService : IBackgroundService, IDisposable
             if (disposing)
             {
                 _backgroundChanged.Dispose();
+                _initLock.Dispose();
             }
 
             _disposed = true;

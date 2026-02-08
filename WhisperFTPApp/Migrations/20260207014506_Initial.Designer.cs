@@ -11,14 +11,14 @@ using WhisperFTPApp.Data;
 namespace WhisperFTPApp.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251109145520_InitialNewMigr")]
-    partial class InitialNewMigr
+    [Migration("20260207014506_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
+            modelBuilder.HasAnnotation("ProductVersion", "9.0.12");
 
             modelBuilder.Entity("WhisperFTPApp.Models.FtpConnectionEntity", b =>
                 {
@@ -28,6 +28,7 @@ namespace WhisperFTPApp.Migrations
 
                     b.Property<string>("Address")
                         .IsRequired()
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("LastUsed")
@@ -35,30 +36,24 @@ namespace WhisperFTPApp.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
+                        .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Password")
                         .IsRequired()
+                        .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Username")
                         .IsRequired()
+                        .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.ToTable("FtpConnections", (string)null);
+                    b.HasIndex("Address");
 
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Address = "ftp://demo.wftpserver.com",
-                            LastUsed = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Name = "ftp://demo.wftpserver.com",
-                            Password = "demo",
-                            Username = "demo"
-                        });
+                    b.ToTable("FtpConnections", (string)null);
                 });
 
             modelBuilder.Entity("WhisperFTPApp.Models.SettingsEntity", b =>
@@ -69,6 +64,7 @@ namespace WhisperFTPApp.Migrations
 
                     b.Property<string>("BackgroundPathImage")
                         .IsRequired()
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");

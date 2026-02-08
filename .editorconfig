@@ -1,37 +1,21 @@
 root = true
 
 [*.cs]
-# Suppress non-critical analyzer warnings
-
-# S1133 : Remove dead code (false positives in some cases)
-dotnet_diagnostic.S1133.severity = suggestion
-
-# CA1515: Types should be internal (not critical for application code)
+# These warnings are excluded from TreatWarningsAsErrors in .csproj
+# Set to suggestion to show them without failing builds
+dotnet_diagnostic.CA1031.severity = suggestion
+dotnet_diagnostic.CA1812.severity = suggestion
+dotnet_diagnostic.CA2007.severity = suggestion
 dotnet_diagnostic.CA1515.severity = suggestion
 
-# CA1031: Catch more specific exceptions (intentional generic catches in some places)
-dotnet_diagnostic.CA1031.severity = suggestion
+[*.{cs,vb}]
+dotnet_diagnostic.CA5392.severity = none
 
-# CA1812: Avoid uninstantiated internal classes (false positives for DI)
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1812.severity = none
-
-# CA1861: Prefer static readonly array (not worth refactoring for migrations)
-dotnet_diagnostic.CA1861.severity = suggestion
-
-# CA1062: Validate public method parameters (covered by ArgumentNullException.ThrowIfNull)
-dotnet_diagnostic.CA1062.severity = suggestion
-
-# CA2000: Dispose objects before losing scope (ReactiveCommand disposal handled)
-dotnet_diagnostic.CA2000.severity = suggestion
-
-# Sonar rules that are too strict for this codebase
-dotnet_diagnostic.S1144.severity = suggestion
-dotnet_diagnostic.S1172.severity = suggestion
-dotnet_diagnostic.S1450.severity = suggestion
-dotnet_diagnostic.S1751.severity = suggestion
-dotnet_diagnostic.S3604.severity = suggestion
-dotnet_diagnostic.S4136.severity = suggestion
-
 
 [*]
 charset = utf-8-bom
@@ -97,7 +81,7 @@ dotnet_style_prefer_simplified_interpolation = true:suggestion
 dotnet_style_prefer_simplified_boolean_expressions = true:suggestion
 
 # Code quality rules
-dotnet_code_quality_unused_parameters = all:warning
+dotnet_code_quality_unused_parameters = all:suggestion
 dotnet_remove_unnecessary_suppression_exclusions = none
 
 # ReSharper properties
@@ -138,10 +122,14 @@ resharper_web_config_wrong_module_highlighting = warning
 indent_style = space
 indent_size = 2
 
+# YAML files (GitHub Actions) - use LF to match .gitattributes
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
 # XML files
 [*.{appxmanifest,asax,ascx,aspx,axaml,blockshader,c,c++,c++m,cc,ccm,cginc,compute,cp,cpp,cppm,cs,cshtml,cu,cuh,cxx,cxxm,dtd,fs,fsi,fsscript,fsx,fx,fxh,h,h++,hh,hlsl,hlsli,hlslinc,hp,hpp,hxx,icc,inc,inl,ino,ipp,ixx,master,ml,mli,mpp,mq4,mq5,mqh,mxx,nuspec,paml,razor,resw,resx,shader,shaderFoundry,skin,tcc,tpp,urtshader,usf,ush,uxml,vb,xaml,xamlx,xoml,xsd}]
 indent_style = space
 indent_size = 4
 tab_width = 4
-
-

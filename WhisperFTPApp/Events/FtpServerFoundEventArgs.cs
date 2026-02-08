@@ -1,4 +1,6 @@
-﻿namespace WhisperFTPApp.Models;
+﻿using WhisperFTPApp.Models;
+
+namespace WhisperFTPApp.Events;
 
 public sealed class FtpServerFoundEventArgs : EventArgs
 {

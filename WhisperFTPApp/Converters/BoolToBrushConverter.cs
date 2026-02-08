@@ -4,7 +4,7 @@ using Avalonia.Media;
 
 namespace WhisperFTPApp.Converters;
 
-public class BoolToBrushConverter : IValueConverter
+internal sealed class BoolToBrushConverter : IValueConverter
 {
     public static readonly BoolToBrushConverter Instance = new();
 

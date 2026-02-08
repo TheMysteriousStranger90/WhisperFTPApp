@@ -21,7 +21,7 @@
                                 IsEnabled="{Binding !IsScanning}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <PathIcon Data="{StaticResource RefreshIcon}"/>
-                                <TextBlock Text="Start Hybrid Scan"/>
+                                <TextBlock Text="{DynamicResource StartHybridScan}"/>
                             </StackPanel>
                         </Button>
 
@@ -38,7 +38,7 @@
                                 IsEnabled="{Binding !IsScanning}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <PathIcon Data="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                                <TextBlock Text="Clear"/>
+                                <TextBlock Text="{DynamicResource Clear}"/>
                             </StackPanel>
                         </Button>
                     </StackPanel>
@@ -51,19 +51,21 @@
                                           Foreground="White"
                                           Width="20"
                                           Height="20"/>
-                                <TextBlock Text="HYBRID SCAN MODE"
+                                <TextBlock Text="{DynamicResource HybridScanMode}"
                                           Foreground="White"
                                           FontSize="14"
                                           FontWeight="Bold"/>
                             </StackPanel>
-                            <TextBlock TextWrapping="Wrap" Foreground="White" FontSize="12" Margin="32,0,0,0">
-                                <Run Text="✓ WiFi Discovery: "/>
-                                <Run Text="Passive - finds all networks without connecting" FontWeight="SemiBold"/>
-                                <LineBreak/>
-                                <Run Text="✓ FTP Scanning: "/>
-                                <Run Text="Active - scans ONLY your current network" FontWeight="SemiBold"/>
-                                <LineBreak/>
-                            </TextBlock>
+                            <StackPanel Spacing="4" Margin="32,0,0,0">
+                                <TextBlock Text="{DynamicResource WiFiDiscovery}"
+                                          TextWrapping="Wrap"
+                                          Foreground="White"
+                                          FontSize="12"/>
+                                <TextBlock Text="{DynamicResource FtpScanning}"
+                                          TextWrapping="Wrap"
+                                          Foreground="White"
+                                          FontSize="12"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
@@ -71,19 +73,19 @@
                     <Border Classes="panel" Padding="12" Background="#10FFFFFF" Margin="0,8,0,0">
                         <Grid ColumnDefinitions="*,*,*,*">
                             <StackPanel Grid.Column="0" Spacing="4">
-                                <TextBlock Text="Networks Found" FontSize="11" Opacity="0.7"/>
+                                <TextBlock Text="{DynamicResource NetworksFound}" FontSize="11" Opacity="0.7"/>
                                 <TextBlock Text="{Binding FoundNetworksCount}" FontSize="20" FontWeight="Bold"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="4">
-                                <TextBlock Text="Hosts Scanned" FontSize="11" Opacity="0.7"/>
+                                <TextBlock Text="{DynamicResource HostsScanned}" FontSize="11" Opacity="0.7"/>
                                 <TextBlock Text="{Binding ScannedHostsCount}" FontSize="20" FontWeight="Bold"/>
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="4">
-                                <TextBlock Text="FTP Servers" FontSize="11" Opacity="0.7"/>
+                                <TextBlock Text="{DynamicResource FtpServersLabel}" FontSize="11" Opacity="0.7"/>
                                 <TextBlock Text="{Binding FoundFtpServersCount}" FontSize="20" FontWeight="Bold"/>
                             </StackPanel>
                             <StackPanel Grid.Column="3" Spacing="4">
-                                <TextBlock Text="Scan Mode" FontSize="11" Opacity="0.7"/>
+                                <TextBlock Text="{DynamicResource ScanModeLabel}" FontSize="11" Opacity="0.7"/>
                                 <TextBlock Text="{Binding ScanMode}" FontSize="14" FontWeight="Bold"/>
                             </StackPanel>
                         </Grid>
@@ -132,21 +134,19 @@
             <!-- Main Content - Tabs -->
             <TabControl Margin="0,8">
                 <!-- Available Networks Tab -->
-                <TabItem Header="Available Networks">
+                <TabItem Header="{DynamicResource AvailableNetworksTab}">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
                             <!-- Info Panel -->
                             <Border Classes="panel" Padding="12">
-                                <StackPanel Spacing="8">
-                                    <TextBlock Text="{Binding Networks.Count, StringFormat='Total Networks: {0}'}"
-                                              FontSize="14"
-                                              FontWeight="SemiBold"/>
-                                    <Border Background="#222" Padding="8" CornerRadius="4">
-                                        <TextBlock Foreground="White" FontSize="11" TextWrapping="Wrap">
-                                            <Run Text="Info: "/>
-                                            <Run Text="This list shows all discoverable WiFi networks. Only your current network is scanned for FTP servers."/>
-                                        </TextBlock>
-                                    </Border>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="{DynamicResource TotalNetworksLabel}"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Networks.Count}"
+                                               FontSize="14"
+                                               FontWeight="Bold"
+                                               Foreground="#4CAF50"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -157,22 +157,22 @@
                                 IsReadOnly="True"
                                 SelectionMode="Single">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="SSID"
+                                <DataGridTextColumn Header="{DynamicResource SSID}"
                                                   Binding="{Binding SSID}"
                                                   Width="200"/>
-                                <DataGridTextColumn Header="BSSID"
+                                <DataGridTextColumn Header="{DynamicResource BSSID}"
                                                   Binding="{Binding BSSID}"
                                                   Width="150"/>
-                                <DataGridTextColumn Header="Signal"
+                                <DataGridTextColumn Header="{DynamicResource Signal}"
                                                   Binding="{Binding SignalStrength, StringFormat='{}{0} dBm'}"
                                                   Width="100"/>
-                                <DataGridTextColumn Header="Channel"
+                                <DataGridTextColumn Header="{DynamicResource Channel}"
                                                   Binding="{Binding Channel}"
                                                   Width="80"/>
-                                <DataGridTextColumn Header="Security"
+                                <DataGridTextColumn Header="{DynamicResource Security}"
                                                   Binding="{Binding SecurityType}"
                                                   Width="150"/>
-                                <DataGridTemplateColumn Header="FTP Status" Width="150">
+                                <DataGridTemplateColumn Header="{DynamicResource FtpStatus}" Width="150">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding ScanStatus}"
@@ -187,7 +187,7 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Last Seen"
+                                <DataGridTextColumn Header="{DynamicResource LastSeen}"
                                                   Binding="{Binding LastSeen, StringFormat='{}{0:HH:mm:ss}'}"
                                                   Width="100"/>
                             </DataGrid.Columns>
@@ -196,24 +196,24 @@
                 </TabItem>
 
                 <!-- Connected Networks Tab -->
-                <TabItem Header="Current Network Details">
+                <TabItem Header="{DynamicResource CurrentNetworkTab}">
                     <DataGrid ItemsSource="{Binding ConnectedNetworks}"
                             AutoGenerateColumns="False"
                             IsReadOnly="True">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="SSID"
+                            <DataGridTextColumn Header="{DynamicResource SSID}"
                                               Binding="{Binding SSID}"
                                               Width="180"/>
-                            <DataGridTextColumn Header="IP Address"
+                            <DataGridTextColumn Header="{DynamicResource IPAddress}"
                                               Binding="{Binding IpAddress}"
                                               Width="140"/>
-                            <DataGridTextColumn Header="Gateway"
+                            <DataGridTextColumn Header="{DynamicResource Gateway}"
                                               Binding="{Binding Gateway}"
                                               Width="140"/>
-                            <DataGridTextColumn Header="Subnet"
+                            <DataGridTextColumn Header="{DynamicResource Subnet}"
                                               Binding="{Binding SubnetMask}"
                                               Width="140"/>
-                            <DataGridTemplateColumn Header="FTP Status" Width="120">
+                            <DataGridTemplateColumn Header="{DynamicResource FtpStatus}" Width="120">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
@@ -224,10 +224,10 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="FTP Server"
+                            <DataGridTextColumn Header="{DynamicResource FtpServer}"
                                               Binding="{Binding FtpServerAddress}"
                                               Width="140"/>
-                            <DataGridTextColumn Header="Speed"
+                            <DataGridTextColumn Header="{DynamicResource Speed}"
                                               Binding="{Binding Speed}"
                                               Width="100"/>
                         </DataGrid.Columns>
@@ -235,7 +235,7 @@
                 </TabItem>
 
                 <!-- FTP Servers Tab -->
-                <TabItem Header="FTP Servers (Current Network)">
+                <TabItem Header="{DynamicResource FtpServersTab}">
                     <DockPanel>
                         <Border Classes="panel" DockPanel.Dock="Top" Padding="12" Margin="0,0,0,8">
                             <StackPanel Spacing="8">
@@ -245,21 +245,21 @@
                                             IsEnabled="{Binding SelectedFtpServer, Converter={x:Static ObjectConverters.IsNotNull}}">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
                                             <PathIcon Data="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 12H5V8h14v10z" Width="16" Height="16"/>
-                                            <TextBlock Text="View Server Details"/>
+                                            <TextBlock Text="{DynamicResource ViewServerDetails}"/>
                                         </StackPanel>
                                     </Button>
-                                    <TextBlock VerticalAlignment="Center" FontSize="13">
-                                        <Run Text="Found:"/>
-                                        <Run Text="{Binding FtpServers.Count}" FontWeight="Bold" Foreground="#4CAF50"/>
-                                        <Run Text="server(s) in your current network"/>
-                                    </TextBlock>
+                                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{DynamicResource FoundLabel}" FontSize="13"/>
+                                        <TextBlock Text="{Binding FtpServers.Count}" FontWeight="Bold" Foreground="#4CAF50" FontSize="13"/>
+                                        <TextBlock Text="{DynamicResource ServersInNetwork}" FontSize="13"/>
+                                    </StackPanel>
                                 </StackPanel>
 
                                 <Border Background="#222" Padding="8" CornerRadius="4">
-                                    <TextBlock Foreground="White" FontSize="11" TextWrapping="Wrap">
-                                        <Run Text="Info: "/>
-                                        <Run Text="These FTP servers are in YOUR current network. To scan other networks, connect to them first using Windows network settings."/>
-                                    </TextBlock>
+                                    <TextBlock Text="{DynamicResource InfoCurrentNetwork}"
+                                              Foreground="White"
+                                              FontSize="11"
+                                              TextWrapping="Wrap"/>
                                 </Border>
                             </StackPanel>
                         </Border>
@@ -270,16 +270,16 @@
                                 IsReadOnly="True"
                                 SelectionMode="Single">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="IP Address"
+                                <DataGridTextColumn Header="{DynamicResource IPAddress}"
                                                   Binding="{Binding IpAddress}"
                                                   Width="140"/>
-                                <DataGridTextColumn Header="Port"
+                                <DataGridTextColumn Header="{DynamicResource Port}"
                                                   Binding="{Binding Port}"
                                                   Width="80"/>
-                                <DataGridTextColumn Header="Server Type"
+                                <DataGridTextColumn Header="{DynamicResource ServerType}"
                                                   Binding="{Binding ServerType}"
                                                   Width="150"/>
-                                <DataGridTemplateColumn Header="Anonymous" Width="100">
+                                <DataGridTemplateColumn Header="{DynamicResource Anonymous}" Width="100">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
@@ -291,7 +291,7 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="SSL" Width="80">
+                                <DataGridTemplateColumn Header="{DynamicResource SSL}" Width="80">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding SupportsSSL}"
@@ -299,13 +299,13 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Response"
+                                <DataGridTextColumn Header="{DynamicResource Response}"
                                                   Binding="{Binding ResponseTime, Converter={x:Static global:TimeSpanToMillisecondsConverter.Instance}}"
                                                   Width="100"/>
-                                <DataGridTextColumn Header="Banner"
+                                <DataGridTextColumn Header="{DynamicResource Banner}"
                                                   Binding="{Binding ServerBanner}"
                                                   Width="*"/>
-                                <DataGridTextColumn Header="Found At"
+                                <DataGridTextColumn Header="{DynamicResource FoundAt}"
                                                   Binding="{Binding DiscoveredAt, StringFormat='{}{0:HH:mm:ss}'}"
                                                   Width="100"/>
                             </DataGrid.Columns>

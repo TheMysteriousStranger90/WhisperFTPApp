@@ -1,19 +1,17 @@
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
 using WhisperFTPApp.ViewModels;
 
 namespace WhisperFTPApp.Views;
 
-public partial class MainWindow : Window
+internal sealed partial class MainWindow : Window
 {
-    public MainWindow(MainWindowViewModel viewModel)
+    public MainWindow()
     {
         InitializeComponent();
-        DataContext = viewModel;
     }
 
-    private void InitializeComponent()
+    public MainWindow(MainWindowViewModel viewModel) : this()
     {
-        AvaloniaXamlLoader.Load(this);
+        DataContext = viewModel;
     }
 }

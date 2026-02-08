@@ -1,15 +1,16 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using WhisperFTPApp.Configurations;
+using WhisperFTPApp.Services;
 
 namespace WhisperFTPApp.Data;
 
-public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
+internal sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {
     public AppDbContext CreateDbContext(string[] args)
     {
+        var pathManager = new PathManagerService();
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        var dbPath = PathManager.GetDatabasePath();
+        var dbPath = pathManager.GetDatabasePath();
 
         optionsBuilder.UseSqlite($"Data Source={dbPath}",
             sqliteOptions =>

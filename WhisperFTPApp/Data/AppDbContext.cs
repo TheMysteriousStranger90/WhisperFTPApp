@@ -3,10 +3,9 @@ using WhisperFTPApp.Models;
 
 namespace WhisperFTPApp.Data;
 
-public class AppDbContext : DbContext
+public sealed class AppDbContext : DbContext
 {
     public DbSet<FtpConnectionEntity> FtpConnections { get; set; } = null!;
-    public DbSet<SettingsEntity> Settings { get; set; } = null!;
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
@@ -18,36 +17,23 @@ public class AppDbContext : DbContext
 
         base.OnModelCreating(modelBuilder);
 
+        ConfigureFtpConnectionEntity(modelBuilder);
+    }
+
+    private static void ConfigureFtpConnectionEntity(ModelBuilder modelBuilder)
+    {
         modelBuilder.Entity<FtpConnectionEntity>(entity =>
         {
             entity.ToTable("FtpConnections");
-            entity.Property(e => e.Name).IsRequired(true);
-            entity.Property(e => e.Address).IsRequired(true);
-            entity.Property(e => e.Username).IsRequired(true);
-            entity.Property(e => e.Password).IsRequired(true);
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.Address).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.Username).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.Password).IsRequired().HasMaxLength(1000);
+            entity.Property(e => e.LastUsed).IsRequired();
 
-            entity.HasData(new FtpConnectionEntity
-            {
-                Id = 1,
-                Name = "ftp://demo.wftpserver.com",
-                Address = "ftp://demo.wftpserver.com",
-                Username = "demo",
-                Password = "demo",
-                LastUsed = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-            });
-        });
-
-        modelBuilder.Entity<SettingsEntity>(entity =>
-        {
-            entity.ToTable("Settings");
-            entity.Property(e => e.Id).IsRequired(true);
-            entity.Property(e => e.BackgroundPathImage).IsRequired(true);
-
-            entity.HasData(new SettingsEntity
-            {
-                Id = 1,
-                BackgroundPathImage = "/Assets/Image (3).jpg",
-            });
+            entity.HasIndex(e => e.Address);
         });
     }
 }

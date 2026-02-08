@@ -1,4 +1,5 @@
-﻿using WhisperFTPApp.Models;
+﻿using WhisperFTPApp.Events;
+using WhisperFTPApp.Models;
 
 namespace WhisperFTPApp.Services.Interfaces;
 
@@ -10,6 +11,6 @@ public interface IWifiScannerService
 
     Task<List<WifiNetwork>> ScanNetworksAsync(CancellationToken token);
     Task<bool> ConnectToNetworkAsync(string ssid);
-    Task<bool> CheckFtpAccessAsync(string ipAddress);
     void StopScan();
+    void ClearScanCache();
 }

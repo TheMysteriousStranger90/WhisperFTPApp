@@ -1,26 +1,38 @@
 ﻿using System.Collections;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Resources;
 using Avalonia;
 using Avalonia.Controls;
 using WhisperFTPApp.Assets;
+using WhisperFTPApp.Constants;
+using WhisperFTPApp.Events;
 
 namespace WhisperFTPApp.Services;
 
-public class CultureChangedEventArgs : EventArgs
+internal sealed class LocalizationService
 {
-    public CultureInfo Culture { get; }
-    public CultureChangedEventArgs(CultureInfo culture) => Culture = culture;
-}
+    private static volatile LocalizationService? _instance;
+    private static readonly object _instanceLock = new();
 
-public class LocalizationService
-{
-    private static LocalizationService? _instance;
-    public static LocalizationService Instance => _instance ??= new LocalizationService();
+    public static LocalizationService Instance
+    {
+        get
+        {
+            var instance = _instance;
+            if (instance != null)
+                return instance;
+
+            lock (_instanceLock)
+            {
+                return _instance ??= new LocalizationService();
+            }
+        }
+    }
 
     private readonly ResourceManager _resourceManager = Resources.ResourceManager;
-    private const string DefaultLanguage = "en";
+    private readonly ConcurrentDictionary<string, string> _cache = new();
 
     public event EventHandler<CultureChangedEventArgs>? CultureChanged;
     public CultureInfo CurrentCulture { get; private set; }
@@ -29,8 +41,8 @@ public class LocalizationService
     {
         try
         {
-            CurrentCulture = new CultureInfo(DefaultLanguage);
-            SetLanguage(DefaultLanguage);
+            CurrentCulture = new CultureInfo(AppConstants.DefaultLanguage);
+            SetLanguage(AppConstants.DefaultLanguage);
         }
         catch (Exception ex)
         {
@@ -41,17 +53,22 @@ public class LocalizationService
 
     public string GetString(string key)
     {
-        try
+        var cacheKey = $"{CurrentCulture.Name}_{key}";
+
+        return _cache.GetOrAdd(cacheKey, _ =>
         {
-            var value = _resourceManager.GetString(key, CurrentCulture);
-            Debug.WriteLine($"GetString: {key} = {value}");
-            return value ?? key;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Error getting string for key {key}: {ex}");
-            return key;
-        }
+            try
+            {
+                var value = _resourceManager.GetString(key, CurrentCulture);
+                Debug.WriteLine($"GetString: {key} = {value}");
+                return value ?? key;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting string for key {key}: {ex}");
+                return key;
+            }
+        });
     }
 
     public void SetLanguage(string cultureName)
@@ -59,6 +76,9 @@ public class LocalizationService
         try
         {
             Debug.WriteLine($"Changing language to: {cultureName}");
+
+            _cache.Clear();
+
             CurrentCulture = new CultureInfo(cultureName);
             Thread.CurrentThread.CurrentUICulture = CurrentCulture;
             Thread.CurrentThread.CurrentCulture = CurrentCulture;
@@ -75,7 +95,8 @@ public class LocalizationService
                 {
                     if (entry.Key != null && entry.Value != null)
                     {
-                        newDict[entry.Key.ToString() ?? throw new InvalidOperationException()] = entry.Value.ToString();
+                        var keyStr = entry.Key.ToString() ?? throw new InvalidOperationException();
+                        newDict[keyStr] = entry.Value.ToString();
                         Debug.WriteLine($"Added resource: {entry.Key} = {entry.Value}");
                     }
                 }

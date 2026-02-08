@@ -14,6 +14,7 @@ internal sealed class SettingsWindowViewModel : ReactiveObject
 {
     private readonly LocalizationService _localizationService;
     private readonly IBackgroundService _backgroundService;
+    private readonly ISettingsService _settingsService;
     private CultureInfo _selectedLanguage;
     private string _selectedBackground;
 
@@ -28,6 +29,7 @@ internal sealed class SettingsWindowViewModel : ReactiveObject
             if (value != null)
             {
                 _localizationService.SetLanguage(value.Name);
+                _ = SaveLanguageAsync(value.Name);
             }
         }
     }
@@ -44,16 +46,20 @@ internal sealed class SettingsWindowViewModel : ReactiveObject
         set
         {
             this.RaiseAndSetIfChanged(ref _selectedBackground, value);
-            _ = _backgroundService.ChangeBackgroundAsync(value);
+            _ = ChangeBackgroundAsync(value);
         }
     }
 
-    public SettingsWindowViewModel(ISettingsService settingsService, IBackgroundService backgroundService, LocalizationService localizationService)
+    public SettingsWindowViewModel(
+        ISettingsService settingsService,
+        IBackgroundService backgroundService,
+        LocalizationService localizationService)
     {
         ArgumentNullException.ThrowIfNull(settingsService);
         ArgumentNullException.ThrowIfNull(backgroundService);
         ArgumentNullException.ThrowIfNull(localizationService);
 
+        _settingsService = settingsService;
         _backgroundService = backgroundService;
         _selectedBackground = _backgroundService.CurrentBackground;
 
@@ -78,7 +84,31 @@ internal sealed class SettingsWindowViewModel : ReactiveObject
             new CultureInfo("en"),
             new CultureInfo("ru-RU")
         ];
-        _selectedLanguage = AvailableLanguages.First(l =>
-            l.Name == Thread.CurrentThread.CurrentUICulture.Name);
+        _selectedLanguage = AvailableLanguages.FirstOrDefault(l =>
+            l.Name == _localizationService.CurrentCulture.Name) ?? AvailableLanguages[0];
+    }
+
+    private async Task ChangeBackgroundAsync(string path)
+    {
+        try
+        {
+            await _backgroundService.ChangeBackgroundAsync(path).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Error changing background: {ex.Message}");
+        }
+    }
+
+    private async Task SaveLanguageAsync(string language)
+    {
+        try
+        {
+            await _settingsService.SaveLanguageSettingAsync(language).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogError($"Error saving language: {ex.Message}");
+        }
     }
 }

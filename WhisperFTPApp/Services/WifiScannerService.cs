@@ -4,6 +4,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using NativeWifi;
 using WhisperFTPApp.Enums;
+using WhisperFTPApp.Events;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
 using WhisperFTPApp.Services.Interfaces;
@@ -675,6 +676,8 @@ internal sealed class WifiScannerService : IWifiScannerService, IDisposable
     }
 
     [Obsolete("Use ScanCurrentNetworkForFtpAsync instead")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Major Code Smell", "S1133:Deprecated code should be removed",
+        Justification = "Kept for backward compatibility, will be removed in next major version")]
     public Task<bool> CheckFtpAccessAsync(string ipAddress)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

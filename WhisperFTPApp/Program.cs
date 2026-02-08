@@ -1,18 +1,36 @@
 ﻿using Avalonia;
 using Avalonia.ReactiveUI;
+using WhisperFTPApp.Services;
 
 namespace WhisperFTPApp;
 
 internal static class Program
 {
-    // Initialization code. Don't use any Avalonia, third-party APIs or any
-    // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
-    // yet and stuff might break.
-    [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    private static SingleInstanceService? _singleInstance;
 
-    // Avalonia configuration, don't remove; also used by visual designer.
+    [STAThread]
+    public static int Main(string[] args)
+    {
+        _singleInstance = new SingleInstanceService();
+
+        if (!_singleInstance.TryAcquire())
+        {
+            SingleInstanceService.BringExistingInstanceToFront();
+            _singleInstance.Dispose();
+            return 1;
+        }
+
+        try
+        {
+            return BuildAvaloniaApp()
+                .StartWithClassicDesktopLifetime(args);
+        }
+        finally
+        {
+            _singleInstance.Dispose();
+        }
+    }
+
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()

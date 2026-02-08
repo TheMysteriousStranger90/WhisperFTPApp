@@ -9,4 +9,6 @@ public interface ISettingsService
     Task DeleteConnectionAsync(FtpConnectionEntity connection, CancellationToken cancellationToken = default);
     Task SaveBackgroundSettingAsync(string backgroundPath, CancellationToken cancellationToken = default);
     Task<string> LoadBackgroundSettingAsync(CancellationToken cancellationToken = default);
+    Task SaveLanguageSettingAsync(string language, CancellationToken cancellationToken = default);
+    Task<string> LoadLanguageSettingAsync(CancellationToken cancellationToken = default);
 }

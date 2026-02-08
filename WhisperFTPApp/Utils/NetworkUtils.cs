@@ -32,24 +32,26 @@ internal static class NetworkUtils
         var networks = wlanIface.GetAvailableNetworkList(0)
             .Where(network => GetStringForSSID(network.dot11Ssid) == GetStringForSSID(ssid));
 
-        foreach (var network in networks)
-        {
-            if (!network.securityEnabled)
-            {
-                return "IEEE80211_Open";
-            }
+        var network = networks.FirstOrDefault();
 
-            return network.dot11DefaultAuthAlgorithm switch
-            {
-                Wlan.Dot11AuthAlgorithm.RSNA => "WPA2",
-                Wlan.Dot11AuthAlgorithm.WPA => "WPA",
-                Wlan.Dot11AuthAlgorithm.WPA_PSK => "WPA_PSK",
-                Wlan.Dot11AuthAlgorithm.IEEE80211_Open => "Open",
-                _ => network.dot11DefaultAuthAlgorithm.ToString()
-            };
+        if (network.dot11Ssid.SSIDLength == 0)
+        {
+            return "Unknown";
         }
 
-        return "Unknown";
+        if (!network.securityEnabled)
+        {
+            return "IEEE80211_Open";
+        }
+
+        return network.dot11DefaultAuthAlgorithm switch
+        {
+            Wlan.Dot11AuthAlgorithm.RSNA => "WPA2",
+            Wlan.Dot11AuthAlgorithm.WPA => "WPA",
+            Wlan.Dot11AuthAlgorithm.WPA_PSK => "WPA_PSK",
+            Wlan.Dot11AuthAlgorithm.IEEE80211_Open => "Open",
+            _ => network.dot11DefaultAuthAlgorithm.ToString()
+        };
     }
 
     public static int GetChannelFromFrequency(uint frequency)

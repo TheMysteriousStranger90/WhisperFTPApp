@@ -5,16 +5,16 @@ using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using WhisperFTPApp.Configurations;
 using WhisperFTPApp.Data;
 using WhisperFTPApp.Extensions;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Services;
+using WhisperFTPApp.Services.Interfaces;
 using WhisperFTPApp.Views;
 
 namespace WhisperFTPApp;
 
-public partial class App : Application
+internal sealed partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
 
@@ -26,13 +26,13 @@ public partial class App : Application
         {
             try
             {
-                StaticFileLogger.LogInformation("Setting initial language...");
+                StaticFileLogger.LogInformation("Application initializing...");
                 LocalizationService.Instance.SetLanguage("en");
-                StaticFileLogger.LogInformation("Language set successfully");
+                StaticFileLogger.LogInformation("Default language set successfully");
             }
             catch (Exception ex)
             {
-                StaticFileLogger.LogError($"Error setting language: {ex}");
+                StaticFileLogger.LogException(ex, "Error setting language");
             }
         }
     }
@@ -53,19 +53,17 @@ public partial class App : Application
 
             if (!Design.IsDesignMode)
             {
-                InitializeDatabase(_serviceProvider);
+                InitializeDatabase();
+                LoadSavedLanguage();
+                _ = InitializeServicesAsync();
             }
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.MainWindow = _serviceProvider.GetRequiredService<MainWindow>();
-
                 desktop.Exit += OnExit;
 
-                if (!Design.IsDesignMode)
-                {
-                    StaticFileLogger.LogInformation("Application initialized successfully");
-                }
+                StaticFileLogger.LogInformation("Application initialized successfully");
             }
 
             base.OnFrameworkInitializationCompleted();
@@ -74,31 +72,71 @@ public partial class App : Application
         {
             if (!Design.IsDesignMode)
             {
-                StaticFileLogger.LogError($"Application startup failed: {ex.Message}\nStackTrace: {ex.StackTrace}");
+                StaticFileLogger.LogException(ex, "Application startup failed");
             }
+
             throw;
         }
     }
 
-    private static void InitializeDatabase(IServiceProvider serviceProvider)
+    private void InitializeDatabase()
     {
+        if (_serviceProvider == null) return;
+
         try
         {
-            var dbPath = PathManager.GetDatabasePath();
+            var pathManager = _serviceProvider.GetRequiredService<IPathManager>();
+            var dbPath = pathManager.GetDatabasePath();
             StaticFileLogger.LogInformation($"Initializing database at: {dbPath}");
 
-            var contextFactory = serviceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+            var contextFactory = _serviceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
 
             using var context = contextFactory.CreateDbContext();
-
             context.Database.EnsureCreated();
 
             StaticFileLogger.LogInformation("Database initialized successfully");
         }
         catch (Exception dbEx)
         {
-            StaticFileLogger.LogError($"Database initialization failed: {dbEx}");
+            StaticFileLogger.LogException(dbEx, "Database initialization failed");
             throw;
+        }
+    }
+
+    private void LoadSavedLanguage()
+    {
+        if (_serviceProvider == null) return;
+
+        try
+        {
+            var settingsService = _serviceProvider.GetRequiredService<ISettingsService>();
+            var language = settingsService.LoadLanguageSettingAsync().GetAwaiter().GetResult();
+
+            if (!string.IsNullOrWhiteSpace(language))
+            {
+                LocalizationService.Instance.SetLanguage(language);
+                StaticFileLogger.LogInformation($"Saved language restored: {language}");
+            }
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogException(ex, "Error loading saved language");
+        }
+    }
+
+    private async Task InitializeServicesAsync()
+    {
+        if (_serviceProvider == null) return;
+
+        try
+        {
+            var backgroundService = _serviceProvider.GetRequiredService<IBackgroundService>();
+            await backgroundService.InitializeAsync().ConfigureAwait(false);
+            StaticFileLogger.LogInformation("Background service initialized");
+        }
+        catch (Exception ex)
+        {
+            StaticFileLogger.LogException(ex, "Service initialization failed");
         }
     }
 
@@ -106,15 +144,17 @@ public partial class App : Application
     {
         try
         {
-            StaticFileLogger.LogInformation("Disposing services...");
+            StaticFileLogger.LogInformation("Application shutting down...");
+            StaticFileLogger.Flush();
 
             _serviceProvider?.Dispose();
 
             StaticFileLogger.LogInformation("Application closed successfully");
+            StaticFileLogger.Flush();
         }
         catch (Exception ex)
         {
-            StaticFileLogger.LogError($"Error during shutdown: {ex}");
+            StaticFileLogger.LogException(ex, "Error during shutdown");
         }
     }
 }

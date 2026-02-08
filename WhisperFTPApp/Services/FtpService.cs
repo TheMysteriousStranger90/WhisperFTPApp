@@ -1,4 +1,5 @@
 ﻿using FluentFTP;
+using FluentFTP.Exceptions;
 using WhisperFTPApp.Configurations;
 using WhisperFTPApp.Logger;
 using WhisperFTPApp.Models;
@@ -9,10 +10,10 @@ namespace WhisperFTPApp.Services;
 internal sealed class FtpService : IFtpService, IDisposable
 {
     private AsyncFtpClient? _client;
+    private readonly SemaphoreSlim _clientLock = new(1, 1);
     private const int MaxRetries = 3;
     private const int BaseDelay = 2000;
-
-    #region Connection Management
+    private bool _disposed;
 
     public async Task<bool> ConnectAsync(FtpConfiguration configuration, CancellationToken cancellationToken = default)
     {
@@ -20,67 +21,127 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         StaticFileLogger.LogInformation($"Attempting to connect to {configuration.FtpAddress}");
 
-        for (int attempt = 1; attempt <= MaxRetries; attempt++)
+        await _clientLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            try
+            for (int attempt = 1; attempt <= MaxRetries; attempt++)
             {
-                StaticFileLogger.LogInformation($"Connection attempt {attempt} of {MaxRetries}");
-
-                _client = CreateClient(configuration);
-
-                await _client.Connect(cancellationToken).ConfigureAwait(false);
-
-                if (_client.IsConnected)
+                try
                 {
-                    StaticFileLogger.LogInformation("Connection successful");
-                    return true;
+                    StaticFileLogger.LogInformation($"Connection attempt {attempt} of {MaxRetries}");
+
+                    if (_client != null)
+                    {
+                        await _client.DisposeAsync().ConfigureAwait(false);
+                        _client = null;
+                    }
+
+                    _client = CreateClient(configuration);
+                    await _client.Connect(cancellationToken).ConfigureAwait(false);
+
+                    if (_client.IsConnected)
+                    {
+                        StaticFileLogger.LogInformation("Connection successful");
+                        return true;
+                    }
+
+                    StaticFileLogger.LogError($"Connection attempt {attempt} failed");
+
+                    if (attempt < MaxRetries)
+                    {
+                        int delay = BaseDelay * attempt;
+                        StaticFileLogger.LogInformation($"Waiting {delay}ms before retry");
+                        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                    }
                 }
-
-                StaticFileLogger.LogError($"Connection attempt {attempt} failed");
-
-                if (attempt < MaxRetries)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
+                    StaticFileLogger.LogInformation("Connection cancelled by user");
+                    throw;
+                }
+                catch (FtpAuthenticationException ex)
+                {
+                    StaticFileLogger.LogError($"Authentication failed: {ex.Message}");
+                    return false;
+                }
+                catch (FtpSecurityNotAvailableException ex)
+                {
+                    StaticFileLogger.LogError($"SSL/TLS not supported by server: {ex.Message}");
+                    return false;
+                }
+                catch (FtpMissingSocketException ex)
+                {
+                    StaticFileLogger.LogError($"Connection lost (socket): {ex.Message}");
+
+                    if (attempt >= MaxRetries)
+                    {
+                        StaticFileLogger.LogError("Max retries reached after socket failures");
+                        return false;
+                    }
+
                     int delay = BaseDelay * attempt;
-                    StaticFileLogger.LogInformation($"Waiting {delay}ms before retry");
+                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                }
+                catch (FtpCommandException ex)
+                {
+                    StaticFileLogger.LogError(
+                        $"FTP command error on connect (code {ex.CompletionCode}): {ex.Message}");
+
+                    if (attempt >= MaxRetries)
+                    {
+                        StaticFileLogger.LogError("Max retries reached");
+                        return false;
+                    }
+
+                    int delay = BaseDelay * attempt;
+                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    StaticFileLogger.LogError($"Connection attempt {attempt} failed: {ex.Message}");
+
+                    if (attempt >= MaxRetries)
+                    {
+                        StaticFileLogger.LogError("Max retries reached");
+                        return false;
+                    }
+
+                    int delay = BaseDelay * attempt;
                     await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                 }
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                StaticFileLogger.LogInformation("Connection cancelled by user");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                StaticFileLogger.LogError($"Connection attempt {attempt} failed: {ex.Message}");
 
-                if (attempt >= MaxRetries)
-                {
-                    StaticFileLogger.LogError("Max retries reached");
-                    return false;
-                }
-
-                int delay = BaseDelay * attempt;
-                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-            }
+            StaticFileLogger.LogError("All connection attempts failed");
+            return false;
         }
-
-        StaticFileLogger.LogError("All connection attempts failed");
-        return false;
+        finally
+        {
+            _clientLock.Release();
+        }
     }
 
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
-        if (_client != null)
+        await _clientLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            await _client.Disconnect(cancellationToken).ConfigureAwait(false);
-            await _client.DisposeAsync().ConfigureAwait(false);
-            _client = null;
+            if (_client != null)
+            {
+                await _client.Disconnect(cancellationToken).ConfigureAwait(false);
+                await _client.DisposeAsync().ConfigureAwait(false);
+                _client = null;
+            }
+
+            StaticFileLogger.LogInformation("Disconnected from FTP server");
         }
-        StaticFileLogger.LogInformation("Disconnected from FTP server");
+        finally
+        {
+            _clientLock.Release();
+        }
     }
 
-    public async Task<bool> TestSecureConnectionAsync(FtpConfiguration configuration, CancellationToken cancellationToken = default)
+    public async Task<bool> TestSecureConnectionAsync(FtpConfiguration configuration,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -102,16 +163,22 @@ internal sealed class FtpService : IFtpService, IDisposable
 
             return false;
         }
+        catch (FtpSecurityNotAvailableException ex)
+        {
+            StaticFileLogger.LogError($"Server does not support SSL/TLS: {ex.Message}");
+            return false;
+        }
+        catch (FtpAuthenticationException ex)
+        {
+            StaticFileLogger.LogError($"SSL authentication failed: {ex.Message}");
+            return false;
+        }
         catch (Exception ex)
         {
             StaticFileLogger.LogError($"SSL connection failed: {ex.Message}");
             return false;
         }
     }
-
-    #endregion
-
-    #region Directory Operations
 
     public async Task<IEnumerable<FileSystemItem>> ListDirectoryAsync(
         FtpConfiguration configuration,
@@ -125,7 +192,7 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
             var items = await client.GetListing(path, cancellationToken).ConfigureAwait(false);
 
             var result = items.Select(item => new FileSystemItem
@@ -140,6 +207,17 @@ internal sealed class FtpService : IFtpService, IDisposable
 
             StaticFileLogger.LogInformation($"Listed {result.Count} items in directory {path}");
             return result;
+        }
+        catch (FtpCommandException ex) when (ex.CompletionCode == "550")
+        {
+            StaticFileLogger.LogError($"Access denied or directory not found {path}: {ex.Message}");
+            throw;
+        }
+        catch (FtpMissingSocketException ex)
+        {
+            StaticFileLogger.LogError($"Connection lost while listing {path}: {ex.Message}");
+            ResetClient();
+            throw;
         }
         catch (Exception ex)
         {
@@ -160,10 +238,21 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
             await client.CreateDirectory(remotePath, cancellationToken).ConfigureAwait(false);
 
             StaticFileLogger.LogInformation($"Directory created: {remotePath}");
+        }
+        catch (FtpCommandException ex) when (ex.CompletionCode == "550")
+        {
+            StaticFileLogger.LogInformation(
+                $"Directory already exists or access denied: {remotePath} ({ex.CompletionCode})");
+            throw;
+        }
+        catch (FtpCommandException ex)
+        {
+            StaticFileLogger.LogError($"FTP error creating directory {remotePath}: {ex.CompletionCode} - {ex.Message}");
+            throw;
         }
         catch (Exception ex)
         {
@@ -184,10 +273,21 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
             await client.DeleteDirectory(path, cancellationToken).ConfigureAwait(false);
 
             StaticFileLogger.LogInformation($"Directory deleted successfully: {path}");
+        }
+        catch (FtpCommandException ex) when (ex.CompletionCode is "550" or "450")
+        {
+            StaticFileLogger.LogError(
+                $"Cannot delete directory {path}: {(ex.CompletionCode == "550" ? "access denied or not empty" : "directory busy")}");
+            throw;
+        }
+        catch (FtpCommandException ex)
+        {
+            StaticFileLogger.LogError($"FTP error deleting directory {path}: {ex.CompletionCode} - {ex.Message}");
+            throw;
         }
         catch (Exception ex)
         {
@@ -206,8 +306,13 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
             return await client.DirectoryExists(remotePath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (FtpCommandException ex)
+        {
+            StaticFileLogger.LogWarning($"FTP error checking directory {remotePath}: {ex.CompletionCode}");
+            return false;
         }
         catch
         {
@@ -223,7 +328,7 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
             var directory = await client.GetWorkingDirectory(cancellationToken).ConfigureAwait(false);
 
             StaticFileLogger.LogInformation($"Current working directory: {directory}");
@@ -236,10 +341,6 @@ internal sealed class FtpService : IFtpService, IDisposable
         }
     }
 
-    #endregion
-
-    #region File Operations
-
     public async Task UploadFileAsync(
         FtpConfiguration configuration,
         string localPath,
@@ -251,41 +352,92 @@ internal sealed class FtpService : IFtpService, IDisposable
         ArgumentNullException.ThrowIfNull(localPath);
         ArgumentNullException.ThrowIfNull(remotePath);
 
-        StaticFileLogger.LogInformation($"Starting upload: {localPath} -> {remotePath}");
+        var fileInfo = new FileInfo(localPath);
+        StaticFileLogger.LogInformation(
+            $"Starting upload: {localPath} -> {remotePath} (Size: {fileInfo.Length} bytes)");
 
-        try
+        int maxRetries = configuration.MaxRetries > 0 ? configuration.MaxRetries : MaxRetries;
+        Exception? lastException = null;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
-
-            Progress<FtpProgress>? ftpProgress = null;
-            if (progress != null)
+            try
             {
-                ftpProgress = new Progress<FtpProgress>(p => progress.Report(p.Progress));
+                var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
+
+                Progress<FtpProgress>? ftpProgress = null;
+                if (progress != null)
+                {
+                    ftpProgress = new Progress<FtpProgress>(p => progress.Report(p.Progress));
+                }
+
+                var result = await client.UploadFile(
+                    localPath,
+                    remotePath,
+                    FtpRemoteExists.Overwrite,
+                    true,
+                    FtpVerify.None,
+                    ftpProgress,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (result == FtpStatus.Success)
+                {
+                    StaticFileLogger.LogInformation($"Upload completed: {remotePath}");
+                    return;
+                }
+
+                var errorMsg = $"Upload returned status {result} for {remotePath} (attempt {attempt}/{maxRetries})";
+                StaticFileLogger.LogError(errorMsg);
+                lastException = new IOException(errorMsg);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                StaticFileLogger.LogInformation("Upload cancelled by user");
+                throw;
+            }
+            catch (FtpCommandException ex) when (ex.CompletionCode is "552" or "553")
+            {
+                StaticFileLogger.LogError(
+                    $"Upload permanently failed for {remotePath}: {ex.CompletionCode} - {ex.Message}");
+                throw;
+            }
+            catch (FtpCommandException ex) when (ex.CompletionCode == "550")
+            {
+                StaticFileLogger.LogError($"Upload access denied for {remotePath}: {ex.Message}");
+                throw;
+            }
+            catch (FtpMissingSocketException ex)
+            {
+                lastException = ex;
+                StaticFileLogger.LogError(
+                    $"Upload connection lost (attempt {attempt}/{maxRetries}) for {remotePath}: {ex.Message}");
+                ResetClient();
+            }
+            catch (FtpCommandException ex)
+            {
+                lastException = ex;
+                StaticFileLogger.LogError(
+                    $"Upload FTP error (attempt {attempt}/{maxRetries}) for {remotePath}: {ex.CompletionCode} - {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                StaticFileLogger.LogError(
+                    $"Upload attempt {attempt}/{maxRetries} failed for {remotePath}: {ex.Message}");
             }
 
-            var result = await client.UploadFile(
-                localPath,
-                remotePath,
-                FtpRemoteExists.Overwrite,
-                true,
-                FtpVerify.None,
-                ftpProgress,
-                cancellationToken).ConfigureAwait(false);
-
-            if (result == FtpStatus.Success)
+            if (attempt < maxRetries)
             {
-                StaticFileLogger.LogInformation($"Upload completed: {remotePath}");
-            }
-            else
-            {
-                StaticFileLogger.LogWarning($"Upload finished with status: {result}");
+                int delay = configuration.RetryDelay > 0 ? configuration.RetryDelay * attempt : BaseDelay * attempt;
+                StaticFileLogger.LogInformation($"Retrying upload in {delay}ms...");
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                ResetClient();
             }
         }
-        catch (Exception ex)
-        {
-            StaticFileLogger.LogError($"Upload failed {remotePath}: {ex.Message}");
-            throw;
-        }
+
+        throw new IOException(
+            $"Upload failed after {maxRetries} attempts for {remotePath}: " +
+            $"{lastException?.Message ?? "Unknown error"}", lastException);
     }
 
     public async Task UploadFileWithResumeAsync(
@@ -303,7 +455,7 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
 
             Progress<FtpProgress>? ftpProgress = null;
             if (progress != null)
@@ -329,6 +481,18 @@ internal sealed class FtpService : IFtpService, IDisposable
                 StaticFileLogger.LogWarning($"Upload finished with status: {result}");
             }
         }
+        catch (FtpCommandException ex) when (ex.CompletionCode is "550" or "552" or "553")
+        {
+            StaticFileLogger.LogError(
+                $"Upload with resume permanently failed for {remotePath}: {ex.CompletionCode} - {ex.Message}");
+            throw;
+        }
+        catch (FtpMissingSocketException ex)
+        {
+            StaticFileLogger.LogError($"Upload with resume lost connection for {remotePath}: {ex.Message}");
+            ResetClient();
+            throw;
+        }
         catch (Exception ex)
         {
             StaticFileLogger.LogError($"Upload with resume failed: {ex.Message}");
@@ -349,52 +513,93 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         StaticFileLogger.LogInformation($"Starting download: {remotePath} -> {localPath}");
 
-        try
+        int maxRetries = configuration.MaxRetries > 0 ? configuration.MaxRetries : MaxRetries;
+        Exception? lastException = null;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
-
-            Progress<FtpProgress>? ftpProgress = null;
-            if (progress != null)
+            try
             {
-                ftpProgress = new Progress<FtpProgress>(p => progress.Report(p.Progress));
+                var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
+
+                Progress<FtpProgress>? ftpProgress = null;
+                if (progress != null)
+                {
+                    ftpProgress = new Progress<FtpProgress>(p => progress.Report(p.Progress));
+                }
+
+                var result = await client.DownloadFile(
+                    localPath,
+                    remotePath,
+                    FtpLocalExists.Overwrite,
+                    FtpVerify.None,
+                    ftpProgress,
+                    cancellationToken).ConfigureAwait(false);
+
+                if (result == FtpStatus.Success)
+                {
+                    StaticFileLogger.LogInformation($"Download completed: {localPath}");
+                    return;
+                }
+
+                var errorMsg = $"Download returned status {result} for {remotePath} (attempt {attempt}/{maxRetries})";
+                StaticFileLogger.LogError(errorMsg);
+                lastException = new IOException(errorMsg);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                CleanupIncompleteFile(localPath);
+                throw;
+            }
+            catch (FtpCommandException ex) when (ex.CompletionCode == "550")
+            {
+                CleanupIncompleteFile(localPath);
+                StaticFileLogger.LogError($"Download access denied or file not found {remotePath}: {ex.Message}");
+                throw;
+            }
+            catch (FtpCommandException ex) when (ex.CompletionCode == "450")
+            {
+                lastException = ex;
+                StaticFileLogger.LogWarning(
+                    $"Download file busy (attempt {attempt}/{maxRetries}) for {remotePath}: {ex.Message}");
+                CleanupIncompleteFile(localPath);
+            }
+            catch (FtpMissingSocketException ex)
+            {
+                lastException = ex;
+                StaticFileLogger.LogError(
+                    $"Download connection lost (attempt {attempt}/{maxRetries}) for {remotePath}: {ex.Message}");
+                CleanupIncompleteFile(localPath);
+                ResetClient();
+            }
+            catch (FtpCommandException ex)
+            {
+                lastException = ex;
+                StaticFileLogger.LogError(
+                    $"Download FTP error (attempt {attempt}/{maxRetries}) for {remotePath}: {ex.CompletionCode} - {ex.Message}");
+                CleanupIncompleteFile(localPath);
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                StaticFileLogger.LogError(
+                    $"Download attempt {attempt}/{maxRetries} failed for {remotePath}: {ex.Message}");
+                CleanupIncompleteFile(localPath);
             }
 
-            var result = await client.DownloadFile(
-                localPath,
-                remotePath,
-                FtpLocalExists.Overwrite,
-                FtpVerify.None,
-                ftpProgress,
-                cancellationToken).ConfigureAwait(false);
-
-            if (result == FtpStatus.Success)
+            if (attempt < maxRetries)
             {
-                StaticFileLogger.LogInformation($"Download completed: {localPath}");
-            }
-            else
-            {
-                StaticFileLogger.LogWarning($"Download finished with status: {result}");
+                int delay = configuration.RetryDelay > 0 ? configuration.RetryDelay * attempt : BaseDelay * attempt;
+                StaticFileLogger.LogInformation($"Retrying download in {delay}ms...");
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                ResetClient();
             }
         }
-        catch (Exception ex)
-        {
-            StaticFileLogger.LogError($"Download failed {remotePath}: {ex.Message}");
 
-            if (File.Exists(localPath))
-            {
-                try
-                {
-                    File.Delete(localPath);
-                    StaticFileLogger.LogInformation($"Deleted incomplete file: {localPath}");
-                }
-                catch (Exception deleteEx)
-                {
-                    StaticFileLogger.LogError($"Failed to delete incomplete file: {deleteEx.Message}");
-                }
-            }
-
-            throw;
-        }
+        CleanupIncompleteFile(localPath);
+        throw new IOException(
+            $"Download failed after {maxRetries} attempts for {remotePath}: " +
+            $"{lastException?.Message ?? "Unknown error"}", lastException);
     }
 
     public async Task DeleteFileAsync(
@@ -409,10 +614,21 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
             await client.DeleteFile(remotePath, cancellationToken).ConfigureAwait(false);
 
             StaticFileLogger.LogInformation($"File deleted successfully: {remotePath}");
+        }
+        catch (FtpCommandException ex) when (ex.CompletionCode is "550" or "450")
+        {
+            StaticFileLogger.LogError(
+                $"Cannot delete file {remotePath}: {(ex.CompletionCode == "550" ? "access denied or not found" : "file busy")}");
+            throw;
+        }
+        catch (FtpCommandException ex)
+        {
+            StaticFileLogger.LogError($"FTP error deleting file {remotePath}: {ex.CompletionCode} - {ex.Message}");
+            throw;
         }
         catch (Exception ex)
         {
@@ -435,10 +651,21 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
             await client.Rename(currentName, newName, cancellationToken).ConfigureAwait(false);
 
             StaticFileLogger.LogInformation("Renamed successfully");
+        }
+        catch (FtpCommandException ex)
+        {
+            var reason = ex.CompletionCode switch
+            {
+                "550" => "source not found or access denied",
+                "553" => "target file name not allowed",
+                _ => $"FTP error {ex.CompletionCode}"
+            };
+            StaticFileLogger.LogError($"Rename failed ({currentName} -> {newName}): {reason} - {ex.Message}");
+            throw;
         }
         catch (Exception ex)
         {
@@ -446,10 +673,6 @@ internal sealed class FtpService : IFtpService, IDisposable
             throw;
         }
     }
-
-    #endregion
-
-    #region File Information
 
     public async Task<bool> FileExistsAsync(
         FtpConfiguration configuration,
@@ -461,8 +684,13 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
             return await client.FileExists(remotePath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (FtpCommandException ex)
+        {
+            StaticFileLogger.LogWarning($"FTP error checking file existence {remotePath}: {ex.CompletionCode}");
+            return false;
         }
         catch
         {
@@ -480,8 +708,14 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
             return await client.GetFileSize(remotePath, -1, cancellationToken).ConfigureAwait(false);
+        }
+        catch (FtpCommandException ex)
+        {
+            StaticFileLogger.LogError(
+                $"FTP error getting file size for {remotePath}: {ex.CompletionCode} - {ex.Message}");
+            return 0;
         }
         catch (Exception ex)
         {
@@ -500,8 +734,14 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
             return await client.GetModifiedTime(remotePath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (FtpCommandException ex)
+        {
+            StaticFileLogger.LogError(
+                $"FTP error getting modified time for {remotePath}: {ex.CompletionCode} - {ex.Message}");
+            return DateTime.MinValue;
         }
         catch (Exception ex)
         {
@@ -520,7 +760,7 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         try
         {
-            var client = await GetOrCreateClient(configuration, cancellationToken).ConfigureAwait(false);
+            var client = await GetOrCreateClientAsync(configuration, cancellationToken).ConfigureAwait(false);
             var size = await client.GetFileSize(remotePath, -1, cancellationToken).ConfigureAwait(false);
             var modified = await client.GetModifiedTime(remotePath, cancellationToken).ConfigureAwait(false);
 
@@ -539,16 +779,17 @@ internal sealed class FtpService : IFtpService, IDisposable
 
             return fileItem;
         }
+        catch (FtpCommandException ex) when (ex.CompletionCode == "550")
+        {
+            StaticFileLogger.LogError($"File not found or access denied: {remotePath}");
+            throw;
+        }
         catch (Exception ex)
         {
             StaticFileLogger.LogError($"Failed to get file details: {ex.Message}");
             throw;
         }
     }
-
-    #endregion
-
-    #region Helper Methods
 
     private static AsyncFtpClient CreateClient(FtpConfiguration configuration)
     {
@@ -558,14 +799,16 @@ internal sealed class FtpService : IFtpService, IDisposable
 
         var client = new AsyncFtpClient(uri.Host, configuration.Username, configuration.Password, configuration.Port);
 
-        // Configure client
-        client.Config.ConnectTimeout = configuration.Timeout > 0 ? configuration.Timeout : 15000;
+        client.Config.ConnectTimeout = configuration.Timeout > 0 ? configuration.Timeout : 30000;
         client.Config.DataConnectionReadTimeout = configuration.ReadWriteTimeout > 0
             ? configuration.ReadWriteTimeout
-            : 30000;
+            : 60000;
         client.Config.DataConnectionConnectTimeout = configuration.ReadWriteTimeout > 0
             ? configuration.ReadWriteTimeout
-            : 30000;
+            : 60000;
+
+        client.Config.TransferChunkSize = configuration.BufferSize;
+        client.Config.LocalFileBufferSize = configuration.BufferSize;
 
         client.Config.EncryptionMode = configuration.EnableSsl
             ? FtpEncryptionMode.Explicit
@@ -584,26 +827,82 @@ internal sealed class FtpService : IFtpService, IDisposable
         client.Config.SocketKeepAlive = true;
 
         StaticFileLogger.LogInformation(
-            $"Client created - Host: {uri.Host}, Port: {configuration.Port}, SSL: {configuration.EnableSsl}, Passive: {configuration.UsePassive}");
+            $"Client created - Host: {uri.Host}, Port: {configuration.Port}, SSL: {configuration.EnableSsl}, " +
+            $"Passive: {configuration.UsePassive}, BufferSize: {configuration.BufferSize}");
 
         return client;
     }
 
-    private async Task<AsyncFtpClient> GetOrCreateClient(FtpConfiguration configuration, CancellationToken cancellationToken)
+    private async Task<AsyncFtpClient> GetOrCreateClientAsync(
+        FtpConfiguration configuration, CancellationToken cancellationToken)
     {
-        if (_client == null || !_client.IsConnected)
+        await _clientLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            await ConnectAsync(configuration, cancellationToken).ConfigureAwait(false);
-        }
+            if (_client != null && _client.IsConnected)
+            {
+                return _client;
+            }
 
-        return _client ?? throw new InvalidOperationException("Failed to create FTP client");
+            if (_client != null)
+            {
+                await _client.DisposeAsync().ConfigureAwait(false);
+                _client = null;
+            }
+
+            _client = CreateClient(configuration);
+            await _client.Connect(cancellationToken).ConfigureAwait(false);
+
+            if (!_client.IsConnected)
+            {
+                throw new InvalidOperationException("Failed to connect FTP client");
+            }
+
+            return _client;
+        }
+        finally
+        {
+            _clientLock.Release();
+        }
     }
 
-    #endregion
+    private void ResetClient()
+    {
+        try
+        {
+            _client?.Dispose();
+        }
+        catch
+        {
+            // ignore cleanup errors
+        }
+
+        _client = null;
+    }
+
+    private static void CleanupIncompleteFile(string localPath)
+    {
+        if (File.Exists(localPath))
+        {
+            try
+            {
+                File.Delete(localPath);
+                StaticFileLogger.LogInformation($"Deleted incomplete file: {localPath}");
+            }
+            catch (Exception deleteEx)
+            {
+                StaticFileLogger.LogError($"Failed to delete incomplete file: {deleteEx.Message}");
+            }
+        }
+    }
 
     public void Dispose()
     {
+        if (_disposed) return;
+
         _client?.Dispose();
         _client = null;
+        _clientLock.Dispose();
+        _disposed = true;
     }
 }
